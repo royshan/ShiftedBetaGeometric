@@ -8,12 +8,31 @@ class ShiftedBeta:
 
         self.data = data
 
+        self.types = sorted(data.keys())
+        self.n_types = len(data)
+
+        # params constructor
+        self.imap = {}
+        self.indicator_map()
+
+        # ps
+        self.alpha = {}
+        self.beta = {}
+
+        # ops obj
         self.opt = None
-        self.alpha = 0.1
-        self.beta = 0.1
+
+    def indicator_map(self):
+        for i, kind in enumerate(self.types):
+
+            bool_ind = numpy.zeros(self.n_types, dtype=bool)
+            bool_ind[0] = True
+            bool_ind[i] = True
+
+            self.imap[kind] = bool_ind
 
     @staticmethod
-    def _P_T_is_t(alpha, beta, num_periods):
+    def _p_t_is_t(alpha, beta, num_periods):
         """
         A function to calculate the expected probabilities recursively.
         Using equation 7 from [1] and the alpha and beta coefficients
@@ -45,7 +64,7 @@ class ShiftedBeta:
         return p
 
     @staticmethod
-    def _survival_function(P_T_is_t):
+    def _survival_function(p_t_is_t):
         """
         Survival function recursive calculation. Using equation 7 from [1]
         and the alpha and beta coefficients obtained by training this
@@ -54,7 +73,7 @@ class ShiftedBeta:
         P_T_is_t calculate the monthly churn rates for the given time
         window, and then use it to compute the survival curve recursively.
 
-        :param P_T_is_t: Deterministic Variable
+        :param p_t_is_t: Deterministic Variable
             The PyMC deterministic variable defined above.
 
         :param num_periods: Int
@@ -67,10 +86,10 @@ class ShiftedBeta:
         """
 
         # Initial values
-        s = [None, 1 - P_T_is_t[1]]
+        s = [None, 1 - p_t_is_t[1]]
 
-        for t in range(2, len(P_T_is_t)):
-            s.append(s[t-1] - P_T_is_t[t])
+        for t in range(2, len(p_t_is_t)):
+            s.append(s[t-1] - p_t_is_t[t])
 
         return s
 
@@ -109,47 +128,74 @@ class ShiftedBeta:
         # but extended to include all cohorts.
         log_like = 0.0
 
-        # A loop through each element in the data list. Remember that
-        # each element correspond to a particular cohort data. The loop
-        # simply carries out the calculation in B3, appendix B, [1].
-        for i, val in enumerate(self.data):
+        for name, data in self.data.iteritems():
 
-            # The number of customer that are still active and the
-            # number of customers lost at each month for which cohort
-            # data is available.
-            active, lost = val
+            bool_ind = self.imap[name]
 
-            # Since the original dataset was augmented earlier in this
-            # method, we must specify the point at which the
-            # calculations performed here should stop. In other words,
-            # length indicates the point at which actual data is
-            # available.
-            length = len(active) - 1
+            alpha_comb = numpy.exp(alpha[bool_ind].sum())
+            beta_comb = numpy.exp(beta[bool_ind].sum())
 
-            # stuff...#
-            pt = self._P_T_is_t(alpha, beta, length + 1)
-            sf = self._survival_function(pt)
+            # A loop through each element in the data list. Remember that
+            # each element correspond to a particular cohort data. The loop
+            # simply carries out the calculation in B3, appendix B, [1].
+            for i, val in enumerate(data):
 
-            # Likelihood of observing such data given the model.
-            # Refer to equation B3 for context.
-            # *** Note that the data is used only up to index length,
-            # hence avoiding the inclusion of augmented data points.
-            # ***
-            died = numpy.log(pt[1:length + 1]) * lost[1:length + 1]
+                # The number of customer that are still active and the
+                # number of customers lost at each month for which cohort
+                # data is available.
+                active, lost = val
 
-            # Likelihood of having this many people left after
-            # some time
-            still_active = numpy.log(sf[length]) * active[length]
+                # Since the original dataset was augmented earlier in this
+                # method, we must specify the point at which the
+                # calculations performed here should stop. In other words,
+                # length indicates the point at which actual data is
+                # available.
+                length = len(active) - 1
 
-            # Update the log_like value.
-            log_like += sum(died) + still_active
+                # stuff...#
+                pt = self._p_t_is_t(alpha_comb, beta_comb, length + 1)
+                sf = self._survival_function(pt)
+
+                # Likelihood of observing such data given the model.
+                # Refer to equation B3 for context.
+                # *** Note that the data is used only up to index length,
+                # hence avoiding the inclusion of augmented data points.
+                # ***
+                died = numpy.log(pt[1:length + 1]) * lost[1:length + 1]
+
+                # Likelihood of having this many people left after
+                # some time
+                still_active = numpy.log(sf[length]) * active[length]
+
+                # Update the log_like value.
+                log_like += sum(died) + still_active
 
         return -log_like
 
     def fit(self):
-        self.opt = minimize(lambda p: self._logp(p[0], p[1]),
-                            [self.alpha, self.beta],
-                            bounds=((0, None), (0, None)))
+        initial_guesses = 3*numpy.random.random((50, 2 * self.n_types)) - 2
 
-        self.alpha = self.opt.x[0]
-        self.beta = self.opt.x[1]
+        optimal = None
+
+        for guess in initial_guesses:
+            new_opt = minimize(lambda p: self._logp(p[:self.n_types], p[self.n_types:]),
+                               guess,
+                               bounds=[(None, None)] * 2 * self.n_types
+                                       )
+
+            if optimal is None:
+                optimal = new_opt.fun
+                self.opt = new_opt.x
+            if new_opt > optimal:
+                optimal = new_opt.fun
+                self.opt = new_opt.x
+
+        self.alpha = {}
+        self.beta = {}
+
+        for name in self.types:
+
+            bool_ind = self.imap[name]
+
+            self.alpha[name] = numpy.exp(self.opt[:self.n_types][bool_ind].sum())
+            self.beta[name] = numpy.exp(self.opt[self.n_types:][bool_ind].sum())
