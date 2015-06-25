@@ -61,7 +61,12 @@ class DataHandler(object):
         self.data = data
         self.cohort = cohort
         self.age = age
-        self.category = category
+
+        # if cat is string, transform it...
+        try:
+            self.category = list(category)
+        except TypeError:
+            self.category = None
 
     def paired_data(self):
         pass
@@ -114,7 +119,7 @@ class DataHandler(object):
 
                     # The key name is given by the category column and the
                     # category value, separated by underscore.
-                    cur_name = self.category + '_' + str(k)
+                    cur_name = category + '_' + str(k)
 
                     # Check if the current name is already an existing key,
                     # if it is not, initialize it with an empty list.
