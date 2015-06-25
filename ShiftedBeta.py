@@ -2,7 +2,7 @@ from scipy.optimize import minimize
 import numpy
 
 
-class ShiftedBeta:
+class ShiftedBeta(object):
 
     def __init__(self, data):
 
@@ -170,31 +170,50 @@ class ShiftedBeta:
                 # Update the log_like value.
                 log_like += sum(died) + still_active
 
+        # Negative log_like since we will use scipy's minimize object.
         return -log_like
 
-    def fit(self):
-        initial_guesses = 3*numpy.random.random((50, 2 * self.n_types)) - 2
+    def fit(self, restarts=50):
+        """
 
+        :param restarts:
+        :return:
+        """
+
+        # guesses of initial parameters
+        initial_guesses = 4 * numpy.random.random((restarts, 2 * self.n_types)) - 3
+
+        # Initialize optimal value to None
+        # I choose not to set it a, say, zero, or any other number, since I am
+        # not sure that the loglikelihood is bounded in anyway. So is better to
+        # initialize with None and use the first optimal value start the ball
+        # rolling.
         optimal = None
 
+        # Run likelihood optimazation for several steps...
         for guess in initial_guesses:
+
+            # --- Optimization
+            # something...
             new_opt = minimize(lambda p: self._logp(p[:self.n_types], p[self.n_types:]),
                                guess,
                                bounds=[(None, None)] * 2 * self.n_types
-                                       )
+                               )
 
+            # If first run...
             if optimal is None:
                 optimal = new_opt.fun
                 self.opt = new_opt.x
+
+            # Have we found a better value yet?
             if new_opt > optimal:
                 optimal = new_opt.fun
                 self.opt = new_opt.x
 
-        self.alpha = {}
-        self.beta = {}
-
+        # Values for all categories.
         for name in self.types:
 
+            # Is boolean ideal?
             bool_ind = self.imap[name]
 
             self.alpha[name] = numpy.exp(self.opt[:self.n_types][bool_ind].sum())
