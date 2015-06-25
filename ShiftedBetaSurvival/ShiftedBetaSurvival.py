@@ -50,11 +50,13 @@ class ShiftedBetaSurvival(object):
         # Trained successful means training is done!
         self.trained = True
 
-    def summary(self):
+    def summary(self, print_res=True):
         """
 
+        :param print_res:
         :return:
         """
+
         # !!!!!!!
         # Get this method to adapt its size to always fit the data!
         # !!!!!!!!!!!!!!
@@ -64,15 +66,23 @@ class ShiftedBetaSurvival(object):
         pdict = self.sb.get_coeffs()
         cate_list = sorted(pdict.keys())
 
-        print "Category" + " "*13 + "| Alpha     | Beta      | Avg Churn |"
-        print "-"*57 + "|"
-        for cate in cate_list:
-            print "{0:20} | {1:9f} | {2:9.5f} | {3:9.5} |" \
-                .format(cate,
+        out = pandas.DataFrame(columns=['Category',
+                                        'Alpha',
+                                        'Beta',
+                                        'Avg Churn'])
+
+        for row, cate in enumerate(cate_list):
+
+            out.loc[row] = [cate,
                         pdict[cate]['alpha'],
                         pdict[cate]['beta'],
                         pdict[cate]['alpha'] /
-                        (pdict[cate]['alpha'] + pdict[cate]['beta']))
+                        (pdict[cate]['alpha'] + pdict[cate]['beta'])]
+
+        if print_res:
+            print out
+        else:
+            return out
 
     def get_params(self):
 
