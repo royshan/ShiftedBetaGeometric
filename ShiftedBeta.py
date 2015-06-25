@@ -8,8 +8,8 @@ class ShiftedBeta(object):
 
         self.data = data
 
-        self.types = sorted(data.keys())
-        self.n_types = len(data)
+        self.categories = sorted(data.keys())
+        self.n_cats = len(data)
 
         # params constructor
         self.imap = {}
@@ -23,49 +23,48 @@ class ShiftedBeta(object):
         self.opt = None
 
     def indicator_map(self):
-        for i, kind in enumerate(self.types):
+        """
+        indicator_map constructs a boolean vector indicating which parameters
+        to use for a given predictor.
 
-            bool_ind = numpy.zeros(self.n_types, dtype=bool)
+        alpha and beta paramaters are assumed to be linear combination like:
+
+            alpha = alpha0 + alpha1 * predictor1 + alpha2 * predictor2 + ...
+
+        and similarly for beta. However, as it stands, predictors are
+        one-hot encoded categorical variables, so at any given time at most
+        only two alpha_i are used, the intercept and coefficient of the
+        current predictor. The indicator_map methods takes care of keeping
+        track of that.
+        """
+
+        # For each category in the data turn on a different combination of a
+        # boolean array.
+        for i, category in enumerate(self.categories):
+
+            # Initial a boolean array as false, with length equal to the
+            # number of available categories.
+            bool_ind = numpy.zeros(self.n_cats, dtype=bool)
+
+            # The intercept (index = 0) is always on.
             bool_ind[0] = True
+
+            # For any category but the first, both the intercept as well as an
+            # extra entry are set to True.
             bool_ind[i] = True
 
-            self.imap[kind] = bool_ind
+            # Change the instance variable imap in place by adding the
+            # appropriate key: bool array pair.
+            self.imap[category] = bool_ind
 
     @staticmethod
-    def _p_t_is_t(alpha, beta, num_periods):
+    def survival_stats(alpha, beta, num_periods):
         """
         A function to calculate the expected probabilities recursively.
         Using equation 7 from [1] and the alpha and beta coefficients
         obtained by training this model, it computes P(T = t) recursively,
         returning a list with all values.
 
-        :param alpha: PyMC distribution
-            The distribution for the alpha parameter.
-
-        :param beta: PyMC distribution
-            The distribution for the beta parameter.
-
-        :param num_periods: Int
-            The number of periods for which the probability of churning
-            should be computed.
-
-        :return: List
-            A list with probability of churning for all periods from month
-            zero to num_periods.
-        """
-
-        # Initialize list with t = 0 and t = 1 values
-        p = [None, alpha / (alpha + beta)]
-
-        for t in range(2, num_periods):
-            pt = (beta + t - 2) / (alpha + beta + t - 1) * p[t-1]
-            p.append(pt)
-
-        return p
-
-    @staticmethod
-    def _survival_function(p_t_is_t):
-        """
         Survival function recursive calculation. Using equation 7 from [1]
         and the alpha and beta coefficients obtained by training this
         model, it computes S(T = t) recursively, returning a list of all
@@ -73,25 +72,35 @@ class ShiftedBeta(object):
         P_T_is_t calculate the monthly churn rates for the given time
         window, and then use it to compute the survival curve recursively.
 
-        :param p_t_is_t: Deterministic Variable
-            The PyMC deterministic variable defined above.
+        :param alpha: float
+            The distribution for the alpha parameter.
+
+        :param beta: float
+            The distribution for the beta parameter.
 
         :param num_periods: Int
             The number of periods for which the probability of churning
             should be computed.
 
-        :return: List
-            A list with values of the survival functions for all periods
-            from month zero to num_periods.
+        :return: (list, list)
+            A list with probability of churning for all periods from month
+            zero to num_periods.
         """
 
-        # Initial values
-        s = [None, 1 - p_t_is_t[1]]
+        # Initialize list with t = 0 and t = 1 values
+        p = [None, alpha / (alpha + beta)]
+        s = [None, 1 - p[1]]
 
-        for t in range(2, len(p_t_is_t)):
-            s.append(s[t-1] - p_t_is_t[t])
+        for t in range(2, num_periods):
+            # Compute latest p value and appen
+            pt = (beta + t - 2) / (alpha + beta + t - 1) * p[t-1]
+            p.append(pt)
 
-        return s
+            # use the most recent appended p value to keep building s
+            s.append(s[t-1] - p[t])
+
+        # finish this...
+        return p, s
 
     def _logp(self, alpha, beta):
         """
@@ -153,8 +162,7 @@ class ShiftedBeta(object):
                 length = len(active) - 1
 
                 # stuff...#
-                pt = self._p_t_is_t(alpha_comb, beta_comb, length + 1)
-                sf = self._survival_function(pt)
+                pt, sf = self.survival_stats(alpha_comb, beta_comb, length + 1)
 
                 # Likelihood of observing such data given the model.
                 # Refer to equation B3 for context.
@@ -181,7 +189,7 @@ class ShiftedBeta(object):
         """
 
         # guesses of initial parameters
-        initial_guesses = 4 * numpy.random.random((restarts, 2 * self.n_types)) - 3
+        initial_guesses = 4 * numpy.random.random((restarts, 2 * self.n_cats)) - 3
 
         # Initialize optimal value to None
         # I choose not to set it a, say, zero, or any other number, since I am
@@ -195,9 +203,9 @@ class ShiftedBeta(object):
 
             # --- Optimization
             # something...
-            new_opt = minimize(lambda p: self._logp(p[:self.n_types], p[self.n_types:]),
+            new_opt = minimize(lambda p: self._logp(p[:self.n_cats], p[self.n_cats:]),
                                guess,
-                               bounds=[(None, None)] * 2 * self.n_types
+                               bounds=[(None, None)] * 2 * self.n_cats
                                )
 
             # If first run...
@@ -211,10 +219,10 @@ class ShiftedBeta(object):
                 self.opt = new_opt.x
 
         # Values for all categories.
-        for name in self.types:
+        for name in self.categories:
 
             # Is boolean ideal?
             bool_ind = self.imap[name]
 
-            self.alpha[name] = numpy.exp(self.opt[:self.n_types][bool_ind].sum())
-            self.beta[name] = numpy.exp(self.opt[self.n_types:][bool_ind].sum())
+            self.alpha[name] = numpy.exp(self.opt[:self.n_cats][bool_ind].sum())
+            self.beta[name] = numpy.exp(self.opt[self.n_cats:][bool_ind].sum())
