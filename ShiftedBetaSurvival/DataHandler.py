@@ -87,6 +87,7 @@ class DataHandler(object):
                 key: zip(list of list, list of list)
         """
 
+        # Missing appropriate commenting...
         d1 = self.aggregate()
         d2 = self.n_lost(d1)
 

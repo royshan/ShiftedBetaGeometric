@@ -7,7 +7,7 @@ from scipy.special import hyp2f1
 
 class ShiftedBetaSurvival(object):
 
-    def __init__(self):
+    def __init__(self, verbose=0):
 
         # ShiftedBeta()
         self.sb = None
@@ -101,6 +101,9 @@ class ShiftedBetaSurvival(object):
             raise ValueError("The number of periods must be a non-zero "
                              "integer")
 
+        if not self.trained:
+            raise RuntimeError('Train the model first!')
+
         pdict = self.sb.get_coeffs()
         churn_by_cate = {}
 
@@ -164,6 +167,9 @@ class ShiftedBetaSurvival(object):
             raise ValueError("The number of periods must be a non-zero "
                              "integer")
 
+        if not self.trained:
+            raise RuntimeError('Train the model first!')
+
         # --- Churn Rates ---
         # Start by calling the method churn_p_of_t to calculate the monthly
         # churn rates gives the model's fitted parameters and the parameters
@@ -199,7 +205,7 @@ class ShiftedBetaSurvival(object):
 
                 surv_by_cate[cate][i + 2] = surv_by_cate[cate][i + 1] - val
 
-        # To data-frame and some reformating
+        # To data-frame and some re-formating
         out = pandas.DataFrame(data=surv_by_cate)
         out = out.iloc[renewals:]
         out.index = range(out.shape[0])
@@ -233,6 +239,20 @@ class ShiftedBetaSurvival(object):
             Either a float with the expected value for the residual LTV or a
             ndarray with the distribution given alpha and beta.
         """
+        # Spot checks making sure the values passed make sense!
+        if arpu < 0:
+            raise ValueError("ARPU must be a non-negative number.")
+
+        if discount_rate <= 0:
+            raise ValueError("The discount rate must be a positive number.")
+
+        if renewals < 0 or not isinstance(renewals, int):
+            raise ValueError("The number of renewals must be a non-zero "
+                             "integer")
+
+        if not self.trained:
+            raise RuntimeError('Train the model first!')
+
         pdict = self.sb.get_coeffs()
         ltv_by_cate = {}
 
@@ -279,7 +299,7 @@ class ShiftedBetaSurvival(object):
         alpha = numpy.asarray(alpha)
         beta = numpy.asarray(beta)
 
-        # To make it so that the formula resambles that of the paper we define
+        # To make it so that the formula resembles that of the paper we define
         # the parameter n as below.
         n = renewals + 1
 

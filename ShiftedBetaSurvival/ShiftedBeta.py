@@ -27,7 +27,7 @@ class ShiftedBeta(object):
         data = [c1, c2, ...]
     """
 
-    def __init__(self, data):
+    def __init__(self, data, verbose=False):
         """
 
         :param data:
@@ -49,6 +49,9 @@ class ShiftedBeta(object):
 
         # ops obj
         self.opt = None
+
+        # verbose param
+        self.verbose = verbose
 
     def indicator_map(self):
         """
@@ -221,7 +224,10 @@ class ShiftedBeta(object):
 
         # Run likelihood optimization for several steps...
         # noinspection PyTypeChecker
-        for guess in initial_guesses:
+        for step, guess in enumerate(initial_guesses):
+
+            if self.verbose:
+                print "Maximization step {0} of {1}".format(step, restarts)
 
             # --- Optimization
             # something...
@@ -256,6 +262,7 @@ class ShiftedBeta(object):
         :return:
         """
 
+        # gets alpha and beta...
         coeffs = {}
 
         for (c1, a), (c2, b) in zip(self.alpha.items(),
@@ -266,7 +273,12 @@ class ShiftedBeta(object):
         return coeffs
 
     def get_params(self):
+        """
 
+        :return:
+        """
+
+        # simple dict of stuff
         params = dict(n_categories=self.n_cats,
                       categories=self.categories,
                       imap=self.imap,
