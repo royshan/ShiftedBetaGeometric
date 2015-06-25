@@ -3,8 +3,36 @@ import numpy
 
 
 class ShiftedBeta(object):
+    """
+    This class implements the Shifted-Beta model by P. Fader and B. Hardie,
+    however, unlike the original paper, we take the bayesian route and compute
+    directly the distributions of parameters alpha and beta using MCMC. These,
+    in turn, are used to estimate the expected values of tenure and LTV.
+
+    This model works by assuming a constant in time, beta distributed
+    individual probability of churn. Due to the heterogeneity of a cohort's
+    churn rates (since each individual will have a different probability of
+    churning), expected behaviours such as the decrease of cohort churn rate
+    over time arise naturally.
+
+    To train the model we need time evolution of a cohort's population in the
+    form:
+        c1 = [N_0, N_1, ...]
+
+    Since we have multiple cohorts coexisting at any given month we may
+    leverage all this information to train the model.
+        c1 = [N1_0, N1_1, ...]
+        c2 = [N2_0, N2_1, ...]
+        ...
+        data = [c1, c2, ...]
+    """
 
     def __init__(self, data):
+        """
+
+        :param data:
+        :return:
+        """
 
         self.data = data
 
@@ -186,12 +214,13 @@ class ShiftedBeta(object):
 
         # Initialize optimal value to None
         # I choose not to set it a, say, zero, or any other number, since I am
-        # not sure that the loglikelihood is bounded in anyway. So is better to
+        # not sure that the log-likelihood is bounded in anyway. So is better to
         # initialize with None and use the first optimal value start the ball
         # rolling.
         optimal = None
 
-        # Run likelihood optimazation for several steps...
+        # Run likelihood optimization for several steps...
+        # noinspection PyTypeChecker
         for guess in initial_guesses:
 
             # --- Optimization

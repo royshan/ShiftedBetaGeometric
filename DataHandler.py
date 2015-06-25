@@ -52,24 +52,50 @@ class DataHandler(object):
             be an integer value, and will determine the time intervals the
             model with work with.
 
-        :param category: list of str
-            A list with the column name(s) of fields to be used as features.
-            These fields are treated as categorical variables and are one hot
-            encoded and fed to a linear model.
+        :param category: str or list of str
+            A list or string with the column name(s) of fields to be used as
+            features. These fields are treated as categorical variables and
+            are one hot encoded and fed to a linear model.
         """
 
         self.data = data
         self.cohort = cohort
         self.age = age
 
-        # if cat is string, transform it...
+        # If the category name was passed as a single string, we turn it into
+        # a list of one element (not list of characters, as you would get with
+        # list('abc').
+        if isinstance(category, str):
+            category = [category]
+        # Try to explicitly transform category to a list (perhaps it was passed
+        # as a tuple or something. If it was None to begin with, we catch a
+        # TypeError and move on.
         try:
             self.category = list(category)
         except TypeError:
             self.category = None
 
     def paired_data(self):
-        pass
+        """
+        Pairs up lists of cohort population with number of individuals lost
+        obtained from aggregate() and n_lost() methods. Returns a dict with
+        one key and zipped values of both lists of lists.
+
+        :return: dict
+            Return zipped values of population and nnumber of individuals lost
+            in the format:
+                key: zip(list of list, list of list)
+        """
+
+        d1 = self.aggregate()
+        d2 = self.n_lost(d1)
+
+        pairs = {}
+
+        for (k1, v1), (k2, v2) in zip(d1.items(), d2.items()):
+            pairs[k1] = zip(v1, v2)
+
+        return pairs
 
     def aggregate(self):
         """
@@ -152,6 +178,13 @@ class DataHandler(object):
             cdata = numpy.zeros(df[age_field].max(), dtype=int)
 
             for index, row in df.iterrows():
+
+                # Make sure age is a positive integer! Otherwise the whole
+                # thing doesn't make a lot of sense!
+                # ** Fractional values are silently handled by numpy. This is
+                # kinda dangerous, and maybe worth keeping an eye on.
+                if row[age_field] <= 0:
+                    raise ValueError('All ages must be positive numbers.')
 
                 cdata[:row[age_field]] += 1
 
