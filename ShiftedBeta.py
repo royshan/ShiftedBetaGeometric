@@ -58,7 +58,7 @@ class ShiftedBeta(object):
             self.imap[category] = bool_ind
 
     @staticmethod
-    def survival_stats(alpha, beta, num_periods):
+    def _recursive_retention_stats(alpha, beta, num_periods):
         """
         A function to calculate the expected probabilities recursively.
         Using equation 7 from [1] and the alpha and beta coefficients
@@ -107,23 +107,14 @@ class ShiftedBeta(object):
         The LogLikelihood function. Given the data and relevant
         variables this function computed the loglikelihood.
 
-        :param value: List
-            The formatted data set --- a list of lists with augmented
-            cohort information.
+        :param alpha: float
+            aaa
 
-        :param P_T_is_t: Deterministic Variable
-            The PyMC deterministic variable defined above.
-
-        :param survival_function: Deterministic Variable
-            The PyMC deterministic variable defined above.
-
-        :param sizes: List
-            A List with the true size of the cohort data. This is used to
-            keep the model from using the augmented data in the formatted
-            dataset (necessary only to please PyMC and simplify life).
+        :param alpha: float
+            bbb
 
         :return: Float
-            The LogLikelihood of the model.
+            Minus the LogLikelihood of the model.
         """
 
         # --- LogLikelihood (One Cohort at a Time) --- #
@@ -159,21 +150,23 @@ class ShiftedBeta(object):
                 # calculations performed here should stop. In other words,
                 # length indicates the point at which actual data is
                 # available.
-                length = len(active) - 1
+                length = len(active)
 
                 # stuff...#
-                pt, sf = self.survival_stats(alpha_comb, beta_comb, length + 1)
+                pt, sf = self._recursive_retention_stats(alpha=alpha_comb,
+                                                         beta=beta_comb,
+                                                         num_periods=length)
 
                 # Likelihood of observing such data given the model.
                 # Refer to equation B3 for context.
                 # *** Note that the data is used only up to index length,
                 # hence avoiding the inclusion of augmented data points.
                 # ***
-                died = numpy.log(pt[1:length + 1]) * lost[1:length + 1]
+                died = numpy.log(pt[1:length]) * lost[1:length]
 
                 # Likelihood of having this many people left after
                 # some time
-                still_active = numpy.log(sf[length]) * active[length]
+                still_active = numpy.log(sf[length - 1]) * active[length - 1]
 
                 # Update the log_like value.
                 log_like += sum(died) + still_active
