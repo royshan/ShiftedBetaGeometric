@@ -183,8 +183,10 @@ class DataHandler(object):
                 # thing doesn't make a lot of sense!
                 # ** Fractional values are silently handled by numpy. This is
                 # kinda dangerous, and maybe worth keeping an eye on.
-                if row[age_field] <= 0:
-                    raise ValueError('All ages must be positive numbers.')
+                if row[age_field] < 1:
+                    raise ValueError('Age value of %s found. All ages must be '
+                                     'equal or larger then one.' %
+                                     row[age_field])
 
                 cdata[:row[age_field]] += 1
 

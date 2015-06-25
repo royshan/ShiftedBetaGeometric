@@ -225,7 +225,8 @@ class ShiftedBeta(object):
 
             # --- Optimization
             # something...
-            new_opt = minimize(lambda p: self._logp(p[:self.n_cats], p[self.n_cats:]),
+            new_opt = minimize(lambda p: self._logp(p[:self.n_cats],
+                                                    p[self.n_cats:]),
                                guess,
                                bounds=[(None, None)] * 2 * self.n_cats
                                )
@@ -248,3 +249,27 @@ class ShiftedBeta(object):
 
             self.alpha[name] = numpy.exp(self.opt[:self.n_cats][bool_ind].sum())
             self.beta[name] = numpy.exp(self.opt[self.n_cats:][bool_ind].sum())
+
+    def get_coeffs(self):
+        """
+
+        :return:
+        """
+
+        coeffs = {}
+
+        for (c1, a), (c2, b) in zip(self.alpha.items(),
+                                    self.beta.items()):
+            coeffs[c1] = dict(alpha=a,
+                              beta=b)
+
+        return coeffs
+
+    def get_params(self):
+
+        params = dict(n_categories=self.n_cats,
+                      categories=self.categories,
+                      imap=self.imap,
+                      )
+
+        return params
