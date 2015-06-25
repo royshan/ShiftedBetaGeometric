@@ -47,6 +47,9 @@ class ShiftedBeta(object):
         self.alpha = {}
         self.beta = {}
 
+        self.alpha_coeffs = None
+        self.beta_coeffs = None
+
         # ops obj
         self.opt = None
 
@@ -247,6 +250,12 @@ class ShiftedBeta(object):
                 optimal = new_opt.fun
                 self.opt = new_opt.x
 
+        # --- Update values of alpha and beta related coefficients ---
+
+        # The full, raw coefficient arrays
+        self.alpha_coeffs = self.opt[:self.n_cats]
+        self.beta_coeffs = self.opt[self.n_cats:]
+
         # Values for all categories.
         for name in self.categories:
 
@@ -282,6 +291,8 @@ class ShiftedBeta(object):
         params = dict(n_categories=self.n_cats,
                       categories=self.categories,
                       imap=self.imap,
+                      coeffs=dict(alpha=self.alpha_coeffs,
+                                  beta=self.beta_coeffs)
                       )
 
         return params

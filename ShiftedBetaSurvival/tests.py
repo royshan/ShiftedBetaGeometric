@@ -63,16 +63,15 @@ def format_article_data(data):
     return dh.paired_data()
 
 
-def article_coefficients(pairs):
-    sb = ShiftedBeta(pairs)
-    sb.fit()
-    print sb.alpha, sb.beta
-
-
 def run_paper_tests():
     paper = make_raw_article_data()
     pairs = format_article_data(paper)
-    article_coefficients(pairs)
+
+    sb = ShiftedBeta(pairs)
+    sb.fit()
+
+    print sb.get_coeffs()
+    print sb.get_params()
 
 def test_big_class():
     paper = make_raw_article_data()
@@ -97,7 +96,7 @@ def format_data_test(data_raw):
 
 if __name__ == '__main__':
 
-    # run_paper_tests()
+    run_paper_tests()
     # format_data_test(data_raw)
-    test_big_class()
+    # test_big_class()
 

@@ -84,7 +84,7 @@ class ShiftedBetaSurvival(object):
         else:
             return out
 
-    def get_params(self):
+    def get_coeffs(self):
 
         if not self.trained:
             raise RuntimeError('Train the model first!')
@@ -114,16 +114,15 @@ class ShiftedBetaSurvival(object):
         if not self.trained:
             raise RuntimeError('Train the model first!')
 
-        pdict = self.sb.get_coeffs()
         churn_by_cate = {}
 
-        for cate in self.sb_params['categories']:
+        for cate, val in self.sb.get_coeffs().items():
 
             # Load alpha and beta sampled from the posterior. These fully
             # determine the beta distribution governing the customer level
             # churn rates
-            alpha = pdict[cate]['alpha']
-            beta = pdict[cate]['beta']
+            alpha = val['alpha']
+            beta = val['beta']
 
             # --- Initialize Output ---
             # Initialize the output as a matrix of zeros. The number of rows is
@@ -213,9 +212,10 @@ class ShiftedBetaSurvival(object):
             # The remaining values are calculated recursively using eq. 7 [1].
             for i, val in enumerate(p_of_t[cate].values[2:]):
 
+                # Something here...
                 surv_by_cate[cate][i + 2] = surv_by_cate[cate][i + 1] - val
 
-        # To data-frame and some re-formating
+        # To data-frame and some re-formatting
         out = pandas.DataFrame(data=surv_by_cate)
         out = out.iloc[renewals:]
         out.index = range(out.shape[0])
@@ -263,13 +263,12 @@ class ShiftedBetaSurvival(object):
         if not self.trained:
             raise RuntimeError('Train the model first!')
 
-        pdict = self.sb.get_coeffs()
         ltv_by_cate = {}
 
-        for cate in self.sb_params['categories']:
+        for cate, val in self.sb.get_coeffs().items():
 
-            ltv_by_cate[cate] = self.derl(alpha=pdict[cate]['alpha'],
-                                          beta=pdict[cate]['beta'],
+            ltv_by_cate[cate] = self.derl(alpha=val['alpha'],
+                                          beta=val['beta'],
                                           arpu=arpu,
                                           discount_rate=discount_rate,
                                           renewals=renewals)
@@ -277,7 +276,7 @@ class ShiftedBetaSurvival(object):
         return ltv_by_cate
 
     def capped_ltv(self):
-        pass
+        print('Not implemented yet, use ltv instead.')
 
     @staticmethod
     def derl(alpha, beta, arpu=1.0, discount_rate=0.005, renewals=0):
