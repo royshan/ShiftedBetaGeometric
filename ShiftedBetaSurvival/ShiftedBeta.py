@@ -32,6 +32,7 @@ class ShiftedBeta(object):
         """
 
         :param data:
+        :param verbose:
         :return:
         """
 
@@ -39,6 +40,7 @@ class ShiftedBeta(object):
 
         self.categories = {}
         self.n_cats = 0
+        # What is this? Why I need this?
         for category in sorted(data.keys()):
             # enter cat
             self.categories[category] = []
@@ -47,7 +49,7 @@ class ShiftedBeta(object):
                 self.categories[category].append(value)
                 self.n_cats += 1
 
-        # params constructor
+        # params constructor, explain!
         self.imap = {}
         # construct imap by looping over all category-value combination and
         # setting a unique boolean array to it. This array will dictate the
@@ -83,18 +85,18 @@ class ShiftedBeta(object):
         track of that.
         """
 
+        # Easier to use an index that is added one
+        index = 0
+
         # For each category in the data turn on a different combination of a
         # boolean array.
-        for i, name_val_pair in enumerate(self.categories.items()):
-            # name_val_pair is a tuple with category name and list of category
-            # values. For each category in the data we turn on a different
-            # combination of a boolean array.
-            category = name_val_pair[0]
-            values_list = name_val_pair[1]
+        for category, values_list in self.categories.items():
 
+            # For each category in the data we turn on a different
+            # combination of a boolean array.
             self.imap[category] = {}
 
-            for j, value in enumerate(values_list):
+            for value in values_list:
 
                 # Initial a boolean array as false, with length equal to the
                 # number of available categories.
@@ -105,11 +107,14 @@ class ShiftedBeta(object):
 
                 # For any category-value combination but the first, both the
                 # intercept as well as an extra entry are set to True.
-                bool_ind[i + j] = True
+                bool_ind[index] = True
 
                 # Change the instance variable imap in place by adding the
                 # appropriate key: bool array pair.
                 self.imap[category][value] = bool_ind
+
+                # add to index
+                index += 1
 
     @staticmethod
     def _recursive_retention_stats(alpha, beta, num_periods):

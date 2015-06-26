@@ -72,7 +72,7 @@ def init_shifted_beta(data):
     #print sb.imap
     #print sb.data
     sb.fit(restarts=3)
-    print sb.alpha, sb.beta
+    print sb.categories
     print sb.get_coeffs()
     print sb.get_params()
 
@@ -88,14 +88,16 @@ def run_paper_tests():
 
 def test_big_class():
     paper = make_raw_article_data()
-    print paper.head()
+    # print paper.head()
 
     sbv = ShiftedBetaSurvival()
     sbv.fit(paper, 'cohort', 'age', 'category')
 
-    sbv.summary()
+    print sbv.summary()
 
     print sbv.ltv()
+
+    print
     print sbv.churn_p_of_t()
     print sbv.survival_function(renewals=1)
 
@@ -107,11 +109,22 @@ def format_data_test(data_raw):
     print dh.aggregate()
     print dh.n_lost(dh.aggregate())
 
+def big_real_data():
+
+    data = pandas.read_csv('./data/data.csv')
+    data['frequency'] = data['frequency'].apply(lambda x: 1 if x != 12 else 12)
+
+    sbv = ShiftedBetaSurvival(verbose=True)
+    sbv.fit(data, 'cohort', 'age', ['il1', 'frequency'], restarts=2)
+
+    print sbv.summary()
+
 if __name__ == '__main__':
 
-    data = format_article_data(make_raw_article_data())
-    init_shifted_beta(data)
+    # data = format_article_data(make_raw_article_data())
+    # init_shifted_beta(data)
     # run_paper_tests()
     # format_data_test(data_raw)
     # test_big_class()
+    big_real_data()
 

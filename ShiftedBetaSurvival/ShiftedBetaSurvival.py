@@ -7,7 +7,7 @@ from scipy.special import hyp2f1
 
 class ShiftedBetaSurvival(object):
 
-    def __init__(self, verbose=0):
+    def __init__(self, verbose=False):
 
         # ShiftedBeta()
         self.sb = None
@@ -28,13 +28,18 @@ class ShiftedBetaSurvival(object):
         self.alpha = None
         self.beta = None
 
+        # verbose controler
+        self.verbose = verbose
+
     def fit(self, df, cohort, age, category=None, restarts=50):
 
+        # Set a bunch of instance parameters
         self.df = df
         self.cohort = cohort
         self.age = age
         self.category = category
 
+        # Create datahandler object
         self.dh = DataHandler(data=self.df,
                               cohort=self.cohort,
                               age=self.age,
@@ -42,47 +47,53 @@ class ShiftedBetaSurvival(object):
 
         self.data = self.dh.paired_data()
 
-        self.sb = ShiftedBeta(self.data)
+        # create shifted beta object
+        self.sb = ShiftedBeta(self.data, verbose=self.verbose)
 
+        # fit to data!
         self.sb.fit(restarts=restarts)
         self.sb_params = self.sb.get_params()
 
         # Trained successful means training is done!
         self.trained = True
 
-    def summary(self, print_res=True):
+    def summary(self):
         """
 
-        :param print_res:
         :return:
         """
 
-        # !!!!!!!
-        # Get this method to adapt its size to always fit the data!
-        # !!!!!!!!!!!!!!
+        # Model ran?
         if not self.trained:
             raise RuntimeError('Train the model first!')
 
-        pdict = self.sb.get_coeffs()
-        cate_list = sorted(pdict.keys())
-
+        # Some info
         out = pandas.DataFrame(columns=['Category',
+                                        'Value',
                                         'Alpha',
                                         'Beta',
                                         'Avg Churn'])
 
-        for row, cate in enumerate(cate_list):
+        row = 0
+        # category loop
+        for category, val_list in self.sb.get_params()['categories'].items():
 
-            out.loc[row] = [cate,
-                        pdict[cate]['alpha'],
-                        pdict[cate]['beta'],
-                        pdict[cate]['alpha'] /
-                        (pdict[cate]['alpha'] + pdict[cate]['beta'])]
+            # value loop
+            for value in val_list:
 
-        if print_res:
-            print out
-        else:
-            return out
+                alpha = self.sb.get_coeffs()[category][value]['alpha']
+                beta = self.sb.get_coeffs()[category][value]['beta']
+
+                # Populate dataframe
+                out.loc[row] = [category,
+                                value,
+                                alpha,
+                                beta,
+                                alpha / (alpha + beta)]
+
+                # Next row, please!
+                row += 1
+        return out
 
     def get_coeffs(self):
 
@@ -116,39 +127,50 @@ class ShiftedBetaSurvival(object):
 
         churn_by_cate = {}
 
-        for cate, val in self.sb.get_coeffs().items():
+        for category, val_dict in self.sb.get_coeffs().items():
 
-            # Load alpha and beta sampled from the posterior. These fully
-            # determine the beta distribution governing the customer level
-            # churn rates
-            alpha = val['alpha']
-            beta = val['beta']
+            # add category dict
+            churn_by_cate[category] = {}
 
-            # --- Initialize Output ---
-            # Initialize the output as a matrix of zeros. The number of rows is
-            # given by the total number of samples, while the number of columns
-            # is the number of months passed as a parameter.
-            churn_by_cate[cate] = numpy.zeros(n_periods)
+            for value, param in val_dict.items():
 
-            # --- Fill output recursively (see eq.7 in [1])---
+                # Load alpha and beta sampled from the posterior. These fully
+                # determine the beta distribution governing the customer level
+                # churn rates
+                alpha = param['alpha']
+                beta = param['beta']
 
-            # Start with month one (churn rate of month zero was set to 0 by
-            # definition).
-            churn_by_cate[cate][1] = alpha / (alpha + beta)
+                # --- Initialize Output ---
+                # Initialize the output as a matrix of zeros. The number of rows is
+                # given by the total number of samples, while the number of columns
+                # is the number of months passed as a parameter.
+                churn_by_cate[category][value] = numpy.zeros(n_periods)
 
-            # Calculate remaining months recursively using the formulas
-            # provided in the original paper.
-            for i in range(2, n_periods):
+                # --- Fill output recursively (see eq.7 in [1])---
 
-                month = i
-                update = (beta + month - 2) / (alpha + beta + month - 1)
+                # Start with month one (churn rate of month zero was set to 0 by
+                # definition).
+                churn_by_cate[category][value][1] = alpha / (alpha + beta)
 
-                # None that i + 1 is simply the previous value, since val
-                # starts with the third entry in the array, but I starts
-                # counting form zero!
-                churn_by_cate[cate][i] += update * churn_by_cate[cate][i - 1]
+                # Calculate remaining months recursively using the formulas
+                # provided in the original paper.
+                for i in range(2, n_periods):
 
-        return pandas.DataFrame(data=churn_by_cate)
+                    month = i
+                    update = (beta + month - 2) / (alpha + beta + month - 1)
+
+                    # None that i + 1 is simply the previous value, since val
+                    # starts with the third entry in the array, but I starts
+                    # counting form zero!
+                    churn_by_cate[category][value][i] += update * churn_by_cate[category][value][i - 1]
+
+        # Mesh category name and values together to output in a DataFrame format.
+        out = pandas.DataFrame()
+        for category, value_dict in churn_by_cate.items():
+            for value, array in value_dict.items():
+                out[category + '_' + str(value)] = array
+
+        return out
 
     def survival_function(self, n_periods=12, renewals=0):
         """
@@ -194,29 +216,40 @@ class ShiftedBetaSurvival(object):
 
         surv_by_cate = {}
 
-        for cate in self.sb_params['categories']:
+        for category, val_dict in self.sb.get_coeffs().items():
 
-            # --- Initialize output ---
-            # The output is initialized as a zero matrix with the same shape
-            # as the churn rates matrix
-            surv_by_cate[cate] = numpy.zeros(p_of_t.shape[0])
+            # add category dict
+            surv_by_cate[category] = {}
 
-            # The initial value is one by definition (in this model death at
-            # t=0 is no considered).
-            surv_by_cate[cate][0] = 1
+            for value, param in val_dict.items():
 
-            # The value of month is simply given by the naive formula
-            #       1 - churn(t=1)
-            surv_by_cate[cate][1] = 1 - p_of_t[cate].values[1]
+                # Dataframe name
+                name = category + '_' + str(value)
 
-            # The remaining values are calculated recursively using eq. 7 [1].
-            for i, val in enumerate(p_of_t[cate].values[2:]):
+                # --- Initialize output ---
+                # The output is initialized as a zero matrix with the same shape
+                # as the churn rates matrix
+                surv_by_cate[category][value] = numpy.zeros(p_of_t.shape[0])
 
-                # Something here...
-                surv_by_cate[cate][i + 2] = surv_by_cate[cate][i + 1] - val
+                # The initial value is one by definition (in this model death at
+                # t=0 is no considered).
+                surv_by_cate[category][value][0] = 1
+
+                # The value of month is simply given by the naive formula
+                #       1 - churn(t=1)
+                surv_by_cate[category][value][1] = 1 - p_of_t[name].values[1]
+
+                # The remaining values are calculated recursively using eq. 7 [1].
+                for i, val in enumerate(p_of_t[name].values[2:]):
+
+                    # Something here...
+                    surv_by_cate[category][value][i + 2] = surv_by_cate[category][value][i + 1] - val
 
         # To data-frame and some re-formatting
-        out = pandas.DataFrame(data=surv_by_cate)
+        out = pandas.DataFrame()
+        for category, value_dict in surv_by_cate.items():
+            for value, array in value_dict.items():
+                out[category + '_' + str(value)] = array
         out = out.iloc[renewals:]
         out.index = range(out.shape[0])
 
@@ -263,19 +296,29 @@ class ShiftedBetaSurvival(object):
         if not self.trained:
             raise RuntimeError('Train the model first!')
 
+        # The usual empty dict to hold a dict of dicts of results
         ltv_by_cate = {}
 
-        for cate, val in self.sb.get_coeffs().items():
+        # category loop
+        for category, val_dict in self.sb.get_coeffs().items():
 
-            ltv_by_cate[cate] = self.derl(alpha=val['alpha'],
-                                          beta=val['beta'],
-                                          arpu=arpu,
-                                          discount_rate=discount_rate,
-                                          renewals=renewals)
+            # add category dict
+            ltv_by_cate[category] = {}
+
+            for value, param in val_dict.items():
+
+                ltv_by_cate[category][value] = \
+                    self.derl(alpha=param['alpha'],
+                              beta=param['beta'],
+                              arpu=arpu,
+                              discount_rate=discount_rate,
+                              renewals=renewals)
 
         return ltv_by_cate
 
     def capped_ltv(self):
+        if not self.trained:
+            raise RuntimeError('Train the model first!')
         print('Not implemented yet, use ltv instead.')
 
     @staticmethod
