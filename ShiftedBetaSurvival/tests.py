@@ -59,8 +59,16 @@ def make_raw_article_data():
 
 def format_article_data(data):
     dh = DataHandler(data, 'cohort', 'age', ['category'])
+
+    #print dh.aggregate()
+    #print dh.n_lost(dh.aggregate())
     print dh.paired_data()
     return dh.paired_data()
+
+def init_shifted_beta(data):
+    sb = ShiftedBeta(data)
+
+    print sb.categories, sb.n_cats
 
 
 def run_paper_tests():
@@ -96,7 +104,9 @@ def format_data_test(data_raw):
 
 if __name__ == '__main__':
 
-    run_paper_tests()
+    data = format_article_data(make_raw_article_data())
+    init_shifted_beta(data)
+    # run_paper_tests()
     # format_data_test(data_raw)
     # test_big_class()
 

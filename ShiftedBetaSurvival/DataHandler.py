@@ -93,8 +93,22 @@ class DataHandler(object):
 
         pairs = {}
 
-        for (k1, v1), (k2, v2) in zip(d1.items(), d2.items()):
-            pairs[k1] = zip(v1, v2)
+        for (cat1, sd1), (cat2, sd2) in zip(d1.items(), d2.items()):
+
+            # Is this necessary? Can they be off sync?
+            assert cat1 == cat2
+
+            # Add cat if not in pairs
+            if cat1 not in pairs:
+                pairs[cat1] = {}
+
+            for (val1, v1), (val2, v2) in zip(sd1.items(), sd2.items()):
+
+                # Is this necessary? Can they be off sync?
+                assert val1 == val2
+
+                # Zip cohort_pop - cohort_lost pairs together.
+                pairs[cat1][val1] = zip(v1, v2)
 
         return pairs
 
@@ -129,11 +143,16 @@ class DataHandler(object):
         if self.category is None:
             # Initiate the output dictionary with a generic key and an empty
             # list to hold the lists of populations.
-            out = {'data': []}
+            out = {'data': {'data': []}}
 
             # Call to the aggregator method. It alters the output dict in
             # place.
-            self.aggregator(out, 'data', self.data, self.cohort, self.age)
+            self.aggregator(out_dict=out,
+                            category='data',
+                            value='data',
+                            data=self.data,
+                            cohort_field=self.cohort,
+                            age_field=self.age)
         else:
             # Initiate an empty dictionary. Key will be entered as needed.
             out = {}
@@ -141,26 +160,37 @@ class DataHandler(object):
             # Loop through all columns names that will be used as categories
             for category in self.category:
 
-                # Split data by category with pandas group by.
-                for k, kdf in self.data.groupby(category):
+                # Check if the current name is already an existing key,
+                # if it is not, initialize it with an empty list.
+                if category not in out:
+                    out[category] = {}
 
-                    # The key name is given by the category column and the
-                    # category value, separated by underscore.
-                    cur_name = category + '_' + str(k)
+                # Split data by category with pandas group by.
+                for cate_val, kdf in self.data.groupby(category):
 
                     # Check if the current name is already an existing key,
                     # if it is not, initialize it with an empty list.
-                    if cur_name not in out:
-                        out[cur_name] = []
+                    if cate_val not in out[category]:
+                        out[category][cate_val] = []
 
                     # Call to the aggregator method. It alters the output dict
                     # in place.
-                    self.aggregator(out, cur_name, kdf, self.cohort, self.age)
+                    self.aggregator(out_dict=out,
+                                    category=category,
+                                    value=cate_val,
+                                    data=kdf,
+                                    cohort_field=self.cohort,
+                                    age_field=self.age)
 
         return out
 
     @staticmethod
-    def aggregator(out_dict, out_name, kind_data, cohort_field, age_field):
+    def aggregator(out_dict,
+                   category,
+                   value,
+                   data,
+                   cohort_field,
+                   age_field):
         """
         aggregator is a static method to alter the output data dictionary in
         place. It appends a list with the cohort population at for every
@@ -174,7 +204,7 @@ class DataHandler(object):
         :return:
         """
 
-        for name, df in kind_data.groupby(cohort_field):
+        for name, df in data.groupby(cohort_field):
 
             cdata = numpy.zeros(df[age_field].max(), dtype=int)
 
@@ -191,7 +221,7 @@ class DataHandler(object):
 
                 cdata[:row[age_field]] += 1
 
-            out_dict[out_name].append(list(cdata))
+            out_dict[category][value].append(list(cdata))
 
     @staticmethod
     def n_lost(data):
@@ -214,17 +244,19 @@ class DataHandler(object):
         # and all subsequent ones calculated from the number of active
         # customers as months i and i-1 and appended to the list below.
         # Finally, the method returns the list.
-        lost_dict = {key: [] for key in data}
+        lost_dict = {category: {val: [] for val in data[category]}
+                     for category in data}
 
-        for key, cohorts in data.iteritems():
+        for category, val_dicts in data.iteritems():
+            for val, cohorts in val_dicts.iteritems():
 
-            for cohort in cohorts:
-                # Initialize with None and calculate subsequent months.
-                lost_num = [None]
-                for i in range(1, len(cohort)):
-                    lost_num.append(cohort[i - 1] - cohort[i])
+                for cohort in cohorts:
+                    # Initialize with None and calculate subsequent months.
+                    lost_num = [None]
+                    for i in range(1, len(cohort)):
+                        lost_num.append(cohort[i - 1] - cohort[i])
 
-                lost_dict[key].append(lost_num)
+                    lost_dict[category][val].append(lost_num)
 
         return lost_dict
 

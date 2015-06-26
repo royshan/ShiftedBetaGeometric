@@ -36,8 +36,15 @@ class ShiftedBeta(object):
 
         self.data = data
 
-        self.categories = sorted(data.keys())
-        self.n_cats = len(data)
+        self.categories = {}
+        self.n_cats = 0
+        for category in sorted(data.keys()):
+            # enter cat
+            self.categories[category] = []
+
+            for value in sorted(data[category].keys()):
+                self.categories[category].append(value)
+                self.n_cats += 1
 
         # params constructor
         self.imap = {}
