@@ -111,18 +111,19 @@ def format_data_test(data_raw):
 
 def big_real_data():
 
-    data = pandas.read_csv('./data/data.csv')
-    data['frequency'] = data['frequency'].apply(lambda x: 1 if x != 12 else 12)
+    data = pandas.read_csv('./data/data.csv', nrows=2500)
 
     sbv = ShiftedBetaSurvival(verbose=True)
-    sbv.fit(data, 'cohort', 'age', ['il1', 'frequency'], restarts=2)
+    sbv.fit(data, 'cohort', 'age', ['il1', 'frequency', 'platform'], restarts=2)
 
     print sbv.summary()
     print
 
-    print data.iloc[:20]
-    print sbv.predict_ltv(data.iloc[:20], arpu=20)
+    #print data.iloc[:20]
+    #print sbv.predict_ltv(data.iloc[:20], arpu=20)
     # print data.iloc[:20].apply(lambda row: sbv._predict_coefficients(row), axis=1)
+
+    print sbv._coefficients_combination()
 
 if __name__ == '__main__':
 

@@ -110,6 +110,22 @@ class ShiftedBetaSurvival(object):
 
         return self.sb.get_coeffs()
 
+    def _coefficients_combination(self):
+
+        categories = sorted(self.sb_params['categories'])
+        print categories
+
+        for i, category_1 in enumerate(categories):
+            for j, category_2 in enumerate(categories[i + 1:]):
+
+                #for k, value_1 in
+
+                combo = category_1 + "_" + category_2
+
+                print combo
+
+        return 0
+
     def _predict_coefficients(self, row):
         """
 
@@ -148,7 +164,7 @@ class ShiftedBetaSurvival(object):
         :param kwargs:
         :return:
         """
-        return df.apply(lambda row: self._predict_row(row, **kwargs), axis=1)
+        return df.apply(lambda row: self._predict_row(row, **kwargs), axis=1).values
 
     def churn_p_of_t(self, n_periods=12):
         """
