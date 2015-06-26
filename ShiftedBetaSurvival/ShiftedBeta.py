@@ -1,4 +1,5 @@
 from scipy.optimize import minimize
+from math import log10
 import numpy
 
 
@@ -48,7 +49,10 @@ class ShiftedBeta(object):
 
         # params constructor
         self.imap = {}
-        self.indicator_map()
+        # construct imap by looping over all category-value combination and
+        # setting a unique boolean array to it. This array will dictate the
+        # combination of weights used in the linear model for this pair.
+        self.imap_constructor()
 
         # ps
         self.alpha = {}
@@ -63,7 +67,7 @@ class ShiftedBeta(object):
         # verbose param
         self.verbose = verbose
 
-    def indicator_map(self):
+    def imap_constructor(self):
         """
         indicator_map constructs a boolean vector indicating which parameters
         to use for a given predictor.
@@ -81,22 +85,31 @@ class ShiftedBeta(object):
 
         # For each category in the data turn on a different combination of a
         # boolean array.
-        for i, category in enumerate(self.categories):
+        for i, name_val_pair in enumerate(self.categories.items()):
+            # name_val_pair is a tuple with category name and list of category
+            # values. For each category in the data we turn on a different
+            # combination of a boolean array.
+            category = name_val_pair[0]
+            values_list = name_val_pair[1]
 
-            # Initial a boolean array as false, with length equal to the
-            # number of available categories.
-            bool_ind = numpy.zeros(self.n_cats, dtype=bool)
+            self.imap[category] = {}
 
-            # The intercept (index = 0) is always on.
-            bool_ind[0] = True
+            for j, value in enumerate(values_list):
 
-            # For any category but the first, both the intercept as well as an
-            # extra entry are set to True.
-            bool_ind[i] = True
+                # Initial a boolean array as false, with length equal to the
+                # number of available categories.
+                bool_ind = numpy.zeros(self.n_cats, dtype=bool)
 
-            # Change the instance variable imap in place by adding the
-            # appropriate key: bool array pair.
-            self.imap[category] = bool_ind
+                # The intercept (index = 0) is always on.
+                bool_ind[0] = True
+
+                # For any category-value combination but the first, both the
+                # intercept as well as an extra entry are set to True.
+                bool_ind[i + j] = True
+
+                # Change the instance variable imap in place by adding the
+                # appropriate key: bool array pair.
+                self.imap[category][value] = bool_ind
 
     @staticmethod
     def _recursive_retention_stats(alpha, beta, num_periods):
@@ -169,48 +182,52 @@ class ShiftedBeta(object):
         # but extended to include all cohorts.
         log_like = 0.0
 
-        for name, data in self.data.iteritems():
+        # loop across categories
+        for category, val_dicts in self.data.iteritems():
 
-            bool_ind = self.imap[name]
+            # Loop across values of these categories
+            for value, data in val_dicts.items():
 
-            alpha_comb = numpy.exp(alpha[bool_ind].sum())
-            beta_comb = numpy.exp(beta[bool_ind].sum())
+                bool_ind = self.imap[category][value]
 
-            # A loop through each element in the data list. Remember that
-            # each element correspond to a particular cohort data. The loop
-            # simply carries out the calculation in B3, appendix B, [1].
-            for i, val in enumerate(data):
+                alpha_comb = numpy.exp(alpha[bool_ind].sum())
+                beta_comb = numpy.exp(beta[bool_ind].sum())
 
-                # The number of customer that are still active and the
-                # number of customers lost at each month for which cohort
-                # data is available.
-                active, lost = val
+                # A loop through each element in the data list. Remember that
+                # each element correspond to a particular cohort data. The loop
+                # simply carries out the calculation in B3, appendix B, [1].
+                for i, val in enumerate(data):
 
-                # Since the original dataset was augmented earlier in this
-                # method, we must specify the point at which the
-                # calculations performed here should stop. In other words,
-                # length indicates the point at which actual data is
-                # available.
-                length = len(active)
+                    # The number of customer that are still active and the
+                    # number of customers lost at each month for which cohort
+                    # data is available.
+                    active, lost = val
 
-                # stuff...#
-                pt, sf = self._recursive_retention_stats(alpha=alpha_comb,
-                                                         beta=beta_comb,
-                                                         num_periods=length)
+                    # Since the original dataset was augmented earlier in this
+                    # method, we must specify the point at which the
+                    # calculations performed here should stop. In other words,
+                    # length indicates the point at which actual data is
+                    # available.
+                    length = len(active)
 
-                # Likelihood of observing such data given the model.
-                # Refer to equation B3 for context.
-                # *** Note that the data is used only up to index length,
-                # hence avoiding the inclusion of augmented data points.
-                # ***
-                died = numpy.log(pt[1:length]) * lost[1:length]
+                    # stuff...#
+                    pt, sf = self._recursive_retention_stats(alpha=alpha_comb,
+                                                             beta=beta_comb,
+                                                             num_periods=length)
 
-                # Likelihood of having this many people left after
-                # some time
-                still_active = numpy.log(sf[length - 1]) * active[length - 1]
+                    # Likelihood of observing such data given the model.
+                    # Refer to equation B3 for context.
+                    # *** Note that the data is used only up to index length,
+                    # hence avoiding the inclusion of augmented data points.
+                    # ***
+                    died = numpy.log(pt[1:length]) * lost[1:length]
 
-                # Update the log_like value.
-                log_like += sum(died) + still_active
+                    # Likelihood of having this many people left after
+                    # some time
+                    still_active = numpy.log(sf[length - 1]) * active[length - 1]
+
+                    # Update the log_like value.
+                    log_like += sum(died) + still_active
 
         # Negative log_like since we will use scipy's minimize object.
         return -log_like
@@ -221,6 +238,8 @@ class ShiftedBeta(object):
         :param restarts:
         :return:
         """
+        # Free space when printing
+        print_space = int(log10(restarts)) + 1
 
         # guesses of initial parameters
         initial_guesses = 4 * numpy.random.random((restarts, 2 * self.n_cats)) - 3
@@ -235,9 +254,6 @@ class ShiftedBeta(object):
         # Run likelihood optimization for several steps...
         # noinspection PyTypeChecker
         for step, guess in enumerate(initial_guesses):
-
-            if self.verbose:
-                print "Maximization step {0} of {1}".format(step, restarts)
 
             # --- Optimization
             # something...
@@ -257,20 +273,34 @@ class ShiftedBeta(object):
                 optimal = new_opt.fun
                 self.opt = new_opt.x
 
+            if self.verbose:
+                print "Maximization step " \
+                      "{0:{2}} of {1:{2}} completed".format(step + 1,
+                                                            restarts,
+                                                            print_space),
+                print "with LogLikelihood: {0}".format(optimal)
+
         # --- Update values of alpha and beta related coefficients ---
 
         # The full, raw coefficient arrays
         self.alpha_coeffs = self.opt[:self.n_cats]
         self.beta_coeffs = self.opt[self.n_cats:]
 
-        # Values for all categories.
-        for name in self.categories:
+        # Categories and their corresponding values
+        for category, val_list in self.categories.items():
 
-            # Is boolean ideal?
-            bool_ind = self.imap[name]
+            # Initialize with empty dict
+            self.alpha[category] = {}
+            self.beta[category] = {}
 
-            self.alpha[name] = numpy.exp(self.opt[:self.n_cats][bool_ind].sum())
-            self.beta[name] = numpy.exp(self.opt[self.n_cats:][bool_ind].sum())
+            # Values list
+            for value in val_list:
+
+                # Is boolean ideal?
+                bool_ind = self.imap[category][value]
+
+                self.alpha[category][value] = numpy.exp(self.opt[:self.n_cats][bool_ind].sum())
+                self.beta[category][value] = numpy.exp(self.opt[self.n_cats:][bool_ind].sum())
 
     def get_coeffs(self):
         """
@@ -281,10 +311,16 @@ class ShiftedBeta(object):
         # gets alpha and beta...
         coeffs = {}
 
-        for (c1, a), (c2, b) in zip(self.alpha.items(),
-                                    self.beta.items()):
-            coeffs[c1] = dict(alpha=a,
-                              beta=b)
+        # Categories and their corresponding values
+        for category, val_list in self.categories.items():
+
+            # Initialize with empty dict
+            coeffs[category] = {}
+
+            # Values list
+            for value in val_list:
+                coeffs[category][value] = dict(alpha=self.alpha[category][value],
+                                               beta=self.beta[category][value])
 
         return coeffs
 

@@ -62,14 +62,19 @@ def format_article_data(data):
 
     #print dh.aggregate()
     #print dh.n_lost(dh.aggregate())
-    print dh.paired_data()
+    #print dh.paired_data()
     return dh.paired_data()
 
 def init_shifted_beta(data):
-    sb = ShiftedBeta(data)
+    sb = ShiftedBeta(data, verbose=True)
 
     print sb.categories, sb.n_cats
-
+    #print sb.imap
+    #print sb.data
+    sb.fit(restarts=3)
+    print sb.alpha, sb.beta
+    print sb.get_coeffs()
+    print sb.get_params()
 
 def run_paper_tests():
     paper = make_raw_article_data()
