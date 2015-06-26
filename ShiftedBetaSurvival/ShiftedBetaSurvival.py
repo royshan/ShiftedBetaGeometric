@@ -2,6 +2,7 @@ from DataHandler import DataHandler
 from ShiftedBeta import ShiftedBeta
 import numpy
 import pandas
+from math import exp
 from scipy.special import hyp2f1
 
 
@@ -70,6 +71,8 @@ class ShiftedBetaSurvival(object):
         # Some info
         out = pandas.DataFrame(columns=['Category',
                                         'Value',
+                                        'Coefficient Alpha',
+                                        'Coefficient Beta',
                                         'Alpha',
                                         'Beta',
                                         'Avg Churn'])
@@ -84,9 +87,14 @@ class ShiftedBetaSurvival(object):
                 alpha = self.sb.get_coeffs()[category][value]['alpha']
                 beta = self.sb.get_coeffs()[category][value]['beta']
 
+                alpha_coeff = self.sb_params['coeffs']['alpha'][self.sb_params['imap'][category][value]][-1]
+                beta_coeff = self.sb_params['coeffs']['beta'][self.sb_params['imap'][category][value]][-1]
+
                 # Populate dataframe
                 out.loc[row] = [category,
                                 value,
+                                alpha_coeff,
+                                beta_coeff,
                                 alpha,
                                 beta,
                                 alpha / (alpha + beta)]
@@ -101,6 +109,46 @@ class ShiftedBetaSurvival(object):
             raise RuntimeError('Train the model first!')
 
         return self.sb.get_coeffs()
+
+    def _predict_coefficients(self, row):
+        """
+
+        :param row:
+        :return:
+        """
+
+        # bool map to pick up correct coefficients
+        bool_map = numpy.zeros(self.sb_params['n_categories'], dtype=bool)
+
+        for category in self.category:
+            # turn appropriate entries to True
+            bool_map[self.sb_params['imap'][category][row[category]]] = True
+
+        # log of sum of coeffs
+        log_alpha = self.sb_params['coeffs']['alpha'][bool_map].sum()
+        log_beta = self.sb_params['coeffs']['beta'][bool_map].sum()
+
+        # return values
+        return dict(alpha=exp(log_alpha), beta=exp(log_beta))
+
+    def _predict_row(self, row, **kwargs):
+        """
+
+        :param row:
+        :param kwargs:
+        :return:
+        """
+        params = self._predict_coefficients(row)
+        return self.derl(alpha=params['alpha'], beta=params['beta'], **kwargs)
+
+    def predict_ltv(self, df, **kwargs):
+        """
+
+        :param df:
+        :param kwargs:
+        :return:
+        """
+        return df.apply(lambda row: self._predict_row(row, **kwargs), axis=1)
 
     def churn_p_of_t(self, n_periods=12):
         """

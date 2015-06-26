@@ -118,6 +118,11 @@ def big_real_data():
     sbv.fit(data, 'cohort', 'age', ['il1', 'frequency'], restarts=2)
 
     print sbv.summary()
+    print
+
+    print data.iloc[:20]
+    print sbv.predict_ltv(data.iloc[:20], arpu=20)
+    # print data.iloc[:20].apply(lambda row: sbv._predict_coefficients(row), axis=1)
 
 if __name__ == '__main__':
 
