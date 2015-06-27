@@ -7,8 +7,26 @@ from scipy.special import hyp2f1
 
 
 class ShiftedBetaSurvival(object):
+    """
+    what is this?
+    """
 
-    def __init__(self, cohort, age, category=None, verbose=False):
+    def __init__(self,
+                 cohort,
+                 age,
+                 category=None,
+                 gamma=1.0,
+                 verbose=False):
+        """
+        stuff ...
+
+        :param cohort:
+        :param age:
+        :param category:
+        :param gamma:
+        :param verbose:
+        :return:
+        """
 
         # Parameters
         self.df = None
@@ -30,10 +48,17 @@ class ShiftedBetaSurvival(object):
         self.alpha = None
         self.beta = None
 
+        # L2 regularizer
+        if gamma < 0:
+            raise ValueError("The regularization constant gamma must be a "
+                             "non-negative real number. A negative value of"
+                             " {} was passed.".format(gamma))
+        self.gamma = gamma
+
         # trained?
         self.trained = False
 
-        # verbose controler
+        # verbose controller
         self.verbose = verbose
 
     def fit(self, df, restarts=50):
@@ -43,7 +68,9 @@ class ShiftedBetaSurvival(object):
         self.data = self.dh.paired_data(df)
 
         # create shifted beta object
-        self.sb = ShiftedBeta(self.data, verbose=self.verbose)
+        self.sb = ShiftedBeta(self.data,
+                              gamma=self.gamma,
+                              verbose=self.verbose)
 
         # fit to data!
         self.sb.fit(restarts=restarts)
@@ -112,7 +139,7 @@ class ShiftedBetaSurvival(object):
         for i, category_1 in enumerate(categories):
             for j, category_2 in enumerate(categories[i + 1:]):
 
-                #for k, value_1 in
+                # for k, value_1 in
 
                 combo = category_1 + "_" + category_2
 

@@ -90,8 +90,8 @@ def test_big_class():
     paper = make_raw_article_data()
     # print paper.head()
 
-    sbv = ShiftedBetaSurvival()
-    sbv.fit(paper, 'cohort', 'age', 'category')
+    sbv = ShiftedBetaSurvival('cohort', 'age', category='category')
+    sbv.fit(paper)
 
     print sbv.summary()
 
@@ -113,14 +113,15 @@ def big_real_data():
 
     data = pandas.read_csv('./data/data.csv', nrows=2500)
 
-    sbv = ShiftedBetaSurvival('cohort', 'age', ['il1', 'frequency'], verbose=True)
+    sbv = ShiftedBetaSurvival(cohort='cohort', age='age', category=['il1', 'frequency'],
+                              gamma=10, verbose=True)
     sbv.fit(data, restarts=2)
 
     print sbv.summary()
     print
 
-    #print data.iloc[:20]
-    #print sbv.predict_ltv(data.iloc[:20], arpu=20)
+    print data.iloc[:20]
+    print sbv.predict_ltv(data.iloc[:20], arpu=20)
     # print data.iloc[:20].apply(lambda row: sbv._predict_coefficients(row), axis=1)
 
     print sbv._coefficients_combination()

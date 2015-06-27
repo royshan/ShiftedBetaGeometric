@@ -28,7 +28,7 @@ class ShiftedBeta(object):
         data = [c1, c2, ...]
     """
 
-    def __init__(self, data, verbose=False):
+    def __init__(self, data, gamma=1.0, verbose=False):
         """
 
         :param data:
@@ -62,6 +62,13 @@ class ShiftedBeta(object):
 
         self.alpha_coeffs = None
         self.beta_coeffs = None
+
+        # regularizer
+        if gamma < 0:
+            raise ValueError("The regularization constant gamma must be a "
+                             "non-negative real number. A negative value of"
+                             " {} was passed.".format(gamma))
+        self.gamma = gamma
 
         # ops obj
         self.opt = None
@@ -166,10 +173,10 @@ class ShiftedBeta(object):
         The LogLikelihood function. Given the data and relevant
         variables this function computed the loglikelihood.
 
-        :param alpha: float
+        :param alpha: array
             aaa
 
-        :param alpha: float
+        :param alpha: array
             bbb
 
         :return: Float
@@ -234,8 +241,16 @@ class ShiftedBeta(object):
                     # Update the log_like value.
                     log_like += sum(died) + still_active
 
+        # L2 regularizer
+        # something about l2 regularization
+        # Explain why the intercept (zero-th index portion of alpha and beta)
+        # are not subject to regularization. Also, think whether this is the
+        # best way of handling this, or whether adding a dedicated intercept
+        # is a better choice.
+        l2_reg = self.gamma * (sum(alpha[1:]**2) + sum(beta[1:]**2))
+
         # Negative log_like since we will use scipy's minimize object.
-        return -log_like
+        return -(log_like - l2_reg)
 
     def fit(self, restarts=50):
         """
