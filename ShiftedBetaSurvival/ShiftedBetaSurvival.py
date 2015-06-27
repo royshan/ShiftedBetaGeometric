@@ -1,3 +1,4 @@
+from __future__ import print_function
 from DataHandler import DataHandler
 from ShiftedBeta import ShiftedBeta
 import numpy
@@ -134,7 +135,7 @@ class ShiftedBetaSurvival(object):
     def _coefficients_combination(self):
 
         categories = sorted(self.sb_params['categories'])
-        print categories
+        print(categories)
 
         for i, category_1 in enumerate(categories):
             for j, category_2 in enumerate(categories[i + 1:]):
@@ -143,7 +144,7 @@ class ShiftedBetaSurvival(object):
 
                 combo = category_1 + "_" + category_2
 
-                print combo
+                print(combo)
 
         return 0
 

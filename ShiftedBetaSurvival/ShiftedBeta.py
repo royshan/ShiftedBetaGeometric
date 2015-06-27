@@ -1,3 +1,4 @@
+from __future__ import print_function
 from scipy.optimize import minimize
 from math import log10
 import numpy
@@ -294,11 +295,11 @@ class ShiftedBeta(object):
                 self.opt = new_opt.x
 
             if self.verbose:
-                print "Maximization step " \
+                print("Maximization step "
                       "{0:{2}} of {1:{2}} completed".format(step + 1,
                                                             restarts,
-                                                            print_space),
-                print "with LogLikelihood: {0}".format(optimal)
+                                                            print_space), end=",")
+                print("with LogLikelihood: {0}".format(optimal))
 
         # --- Update values of alpha and beta related coefficients ---
 
