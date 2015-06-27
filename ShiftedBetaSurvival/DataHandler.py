@@ -28,7 +28,7 @@ class DataHandler(object):
     adjusting all lists of cohort population to have the same length.
     """
 
-    def __init__(self, data, cohort, age, category=None):
+    def __init__(self, cohort, age, category=None):
         """
         The object is initialized with the dataset to be transformed, the name
         of the fields identified as cohort, individual age and optional
@@ -58,7 +58,6 @@ class DataHandler(object):
             are one hot encoded and fed to a linear model.
         """
 
-        self.data = data
         self.cohort = cohort
         self.age = age
 
@@ -75,7 +74,7 @@ class DataHandler(object):
         except TypeError:
             self.category = None
 
-    def paired_data(self):
+    def paired_data(self, data):
         """
         Pairs up lists of cohort population with number of individuals lost
         obtained from aggregate() and n_lost() methods. Returns a dict with
@@ -88,7 +87,7 @@ class DataHandler(object):
         """
 
         # Missing appropriate commenting...
-        d1 = self.aggregate()
+        d1 = self.aggregate(data)
         d2 = self.n_lost(d1)
 
         pairs = {}
@@ -112,7 +111,7 @@ class DataHandler(object):
 
         return pairs
 
-    def aggregate(self):
+    def aggregate(self, data):
         """
         A method to turn a system level data set into lists of cohort
         population, as requires by the shifted beta model.
@@ -150,7 +149,7 @@ class DataHandler(object):
             self.aggregator(out_dict=out,
                             category='data',
                             value='data',
-                            data=self.data,
+                            data=data,
                             cohort_field=self.cohort,
                             age_field=self.age)
         else:
@@ -166,7 +165,7 @@ class DataHandler(object):
                     out[category] = {}
 
                 # Split data by category with pandas group by.
-                for cate_val, kdf in self.data.groupby(category):
+                for cate_val, kdf in data.groupby(category):
 
                     # Check if the current name is already an existing key,
                     # if it is not, initialize it with an empty list.

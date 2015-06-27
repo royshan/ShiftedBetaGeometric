@@ -8,45 +8,39 @@ from scipy.special import hyp2f1
 
 class ShiftedBetaSurvival(object):
 
-    def __init__(self, verbose=False):
+    def __init__(self, cohort, age, category=None, verbose=False):
+
+        # Parameters
+        self.df = None
+        self.data = None
+        self.cohort = cohort
+        self.age = age
+        self.category = category
 
         # ShiftedBeta()
         self.sb = None
         self.sb_params = None
-        # DataHandler()
-        self.dh = None
 
-        self.df = None
-        self.data = None
-        self.cohort = None
-        self.age = None
-        self.category = None
-
-        # trained?
-        self.trained = False
+        # Create data-handler object
+        self.dh = DataHandler(cohort=self.cohort,
+                              age=self.age,
+                              category=self.category)
 
         # params
         self.alpha = None
         self.beta = None
 
+        # trained?
+        self.trained = False
+
         # verbose controler
         self.verbose = verbose
 
-    def fit(self, df, cohort, age, category=None, restarts=50):
+    def fit(self, df, restarts=50):
 
         # Set a bunch of instance parameters
         self.df = df
-        self.cohort = cohort
-        self.age = age
-        self.category = category
-
-        # Create datahandler object
-        self.dh = DataHandler(data=self.df,
-                              cohort=self.cohort,
-                              age=self.age,
-                              category=self.category)
-
-        self.data = self.dh.paired_data()
+        self.data = self.dh.paired_data(df)
 
         # create shifted beta object
         self.sb = ShiftedBeta(self.data, verbose=self.verbose)

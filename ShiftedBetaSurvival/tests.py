@@ -113,8 +113,8 @@ def big_real_data():
 
     data = pandas.read_csv('./data/data.csv', nrows=2500)
 
-    sbv = ShiftedBetaSurvival(verbose=True)
-    sbv.fit(data, 'cohort', 'age', ['il1', 'frequency', 'platform'], restarts=2)
+    sbv = ShiftedBetaSurvival('cohort', 'age', ['il1', 'frequency'], verbose=True)
+    sbv.fit(data, restarts=2)
 
     print sbv.summary()
     print
