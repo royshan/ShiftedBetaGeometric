@@ -289,7 +289,7 @@ class ShiftedBeta(object):
                 self.opt = new_opt.x
 
             # Have we found a better value yet?
-            if new_opt > optimal:
+            if new_opt.fun > optimal:
                 optimal = new_opt.fun
                 self.opt = new_opt.x
 
