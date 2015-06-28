@@ -132,6 +132,6 @@ if __name__ == '__main__':
     # init_shifted_beta(data)
     # run_paper_tests()
     # format_data_test(data_raw)
-    # test_big_class()
-    big_real_data()
+    test_big_class()
+    # big_real_data()
 

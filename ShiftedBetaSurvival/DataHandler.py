@@ -61,7 +61,7 @@ class DataHandler(object):
         # as a tuple or something. If it was None to begin with, we catch a
         # TypeError and move on.
         try:
-            self.category = list(category)
+            self.category = sorted(category)
         except TypeError:
             self.category = None
 
@@ -92,22 +92,22 @@ class DataHandler(object):
 
         pairs = {}
 
-        for (cat1, sd1), (cat2, sd2) in zip(d1.items(), d2.items()):
-
-            # Is this necessary? Can they be off sync?
-            assert cat1 == cat2
+        # Loop over categories and zip the lists
+        for category in self.category:
 
             # Add cat if not in pairs
-            if cat1 not in pairs:
-                pairs[cat1] = {}
+            if category not in pairs:
+                pairs[category] = {}
 
-            for (val1, v1), (val2, v2) in zip(sd1.items(), sd2.items()):
+            # All common values
+            val_keys = set(d1[category]).intersection(set(d2[category]))
 
-                # Is this necessary? Can they be off sync?
-                assert val1 == val2
+            # Loop over values and zip the lists
+            for value in val_keys:
 
                 # Zip cohort_pop - cohort_lost pairs together.
-                pairs[cat1][val1] = zip(v1, v2)
+                pairs[category][value] = zip(d1[category][value],
+                                             d2[category][value])
 
         return pairs
 

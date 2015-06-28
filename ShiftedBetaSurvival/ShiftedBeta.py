@@ -196,7 +196,7 @@ class ShiftedBeta(object):
         log_like = 0.0
 
         # loop across categories
-        for category, val_dicts in self.data.iteritems():
+        for category, val_dicts in self.data.items():
 
             # Loop across values of these categories
             for value, data in val_dicts.items():
@@ -290,7 +290,7 @@ class ShiftedBeta(object):
                 self.opt = new_opt.x
 
             # Have we found a better value yet?
-            if new_opt > optimal:
+            if new_opt.fun > optimal:
                 optimal = new_opt.fun
                 self.opt = new_opt.x
 
