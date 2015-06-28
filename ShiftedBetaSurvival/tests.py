@@ -70,8 +70,10 @@ def init_shifted_beta(data):
     sb = ShiftedBeta(data, verbose=True)
 
     print(sb.categories, sb.n_cats)
-    #print(b.imap)
-    #print(b.data)
+    print(sb.imap)
+
+    print(sb.alpha, sb.beta)
+
     sb.fit(restarts=3)
     print(sb.categories)
     print(sb.get_coeffs())
@@ -112,7 +114,7 @@ def format_data_test(data_raw):
 
 def big_real_data():
 
-    data = pandas.read_csv('./data/data.csv', nrows=2500)
+    data = pandas.read_csv('./data/data.csv', nrows=5000)
 
     sbv = ShiftedBetaSurvival(cohort='cohort', age='age', category=['il1', 'frequency'],
                               gamma=1e-8, verbose=True)
@@ -128,13 +130,16 @@ def big_real_data():
 
 if __name__ == '__main__':
 
-    # data = format_article_data(make_raw_article_data())
-    # print(data)
-    # init_shifted_beta(data)
+    #data = format_article_data(make_raw_article_data())
+    #for c, v in data.items():
+    #    for cc, vv in v.items():
+    #        for vvv in vv:
+    #            print(c, cc, vvv)
+    #init_shifted_beta(data)
     # run_paper_tests()
     # format_data_test(data_raw)
     # test_big_class()
     # big_real_data()
-    test_big_class()
-    #big_real_data()
+    # test_big_class()
+    big_real_data()
 

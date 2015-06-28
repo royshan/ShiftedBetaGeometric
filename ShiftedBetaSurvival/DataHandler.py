@@ -106,8 +106,8 @@ class DataHandler(object):
             for value in val_keys:
 
                 # Zip cohort_pop - cohort_lost pairs together.
-                pairs[category][value] = zip(d1[category][value],
-                                             d2[category][value])
+                pairs[category][value] = list(zip(d1[category][value],
+                                                  d2[category][value]))
 
         return pairs
 

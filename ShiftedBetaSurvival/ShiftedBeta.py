@@ -156,11 +156,11 @@ class ShiftedBeta(object):
 
         # Initialize list with t = 0 and t = 1 values
         p = [None, alpha / (alpha + beta)]
-        s = [None, 1 - p[1]]
+        s = [None, 1. - p[1]]
 
         for t in range(2, num_periods):
             # Compute latest p value and appen
-            pt = (beta + t - 2) / (alpha + beta + t - 1) * p[t-1]
+            pt = (beta + t - 2.) / (alpha + beta + t - 1.) * p[t-1]
             p.append(pt)
 
             # use the most recent appended p value to keep building s
@@ -298,7 +298,7 @@ class ShiftedBeta(object):
                 print("Maximization step "
                       "{0:{2}} of {1:{2}} completed".format(step + 1,
                                                             restarts,
-                                                            print_space), end=",")
+                                                            print_space), end=" ")
                 print("with LogLikelihood: {0}".format(optimal))
 
         # --- Update values of alpha and beta related coefficients ---
