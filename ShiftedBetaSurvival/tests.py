@@ -91,7 +91,7 @@ def test_big_class():
     paper = make_raw_article_data()
     # print(aper.head())
 
-    sbv = ShiftedBetaSurvival('cohort', 'age', category='category')
+    sbv = ShiftedBetaSurvival('cohort', 'age', category='category', gamma=1, verbose=1)
     sbv.fit(paper)
 
     print(sbv.summary())
@@ -115,7 +115,7 @@ def big_real_data():
     data = pandas.read_csv('./data/data.csv', nrows=2500)
 
     sbv = ShiftedBetaSurvival(cohort='cohort', age='age', category=['il1', 'frequency'],
-                              gamma=10, verbose=True)
+                              gamma=1e-8, verbose=True)
     sbv.fit(data, restarts=2)
 
     print(sbv.summary())
@@ -128,11 +128,13 @@ def big_real_data():
 
 if __name__ == '__main__':
 
-    data = format_article_data(make_raw_article_data())
-    print(data)
+    # data = format_article_data(make_raw_article_data())
+    # print(data)
     # init_shifted_beta(data)
     # run_paper_tests()
     # format_data_test(data_raw)
     # test_big_class()
     # big_real_data()
+    test_big_class()
+    #big_real_data()
 
