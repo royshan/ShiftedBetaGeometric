@@ -114,10 +114,10 @@ def format_data_test(data_raw):
 
 def big_real_data():
 
-    data = pandas.read_csv('./data/data.csv', nrows=5000)
+    data = pandas.read_csv('./data/data.csv', nrows=500000)
 
     sbv = ShiftedBetaSurvival(cohort='cohort', age='age', category=['il1', 'frequency'],
-                              gamma=1e-8, verbose=True)
+                              gamma=1e-6, verbose=True)
     sbv.fit(data, restarts=2)
 
     print(sbv.summary())
