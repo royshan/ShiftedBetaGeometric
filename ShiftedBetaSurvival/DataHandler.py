@@ -34,15 +34,6 @@ class DataHandler(object):
         of the fields identified as cohort, individual age and optional
         category(ies) to be used as predictors.
 
-        :param data: pandas DataFrame
-            A system level pandas dataframe. Similar to:
-            _______
-            id | cohort | age | predictors...
-            1  |      a |   3 | ...
-            2  |      b |   7 | ...
-            3  |      a |   4 | ...
-            ...
-
         :param cohort: str
             The column name to identify to which cohort each individual belongs
             to.
@@ -70,7 +61,7 @@ class DataHandler(object):
         # as a tuple or something. If it was None to begin with, we catch a
         # TypeError and move on.
         try:
-            self.category = list(category)
+            self.category = sorted(category)
         except TypeError:
             self.category = None
 
@@ -79,6 +70,15 @@ class DataHandler(object):
         Pairs up lists of cohort population with number of individuals lost
         obtained from aggregate() and n_lost() methods. Returns a dict with
         one key and zipped values of both lists of lists.
+
+        :param data: pandas DataFrame
+            A system level pandas dataframe. Similar to:
+            _______
+            id | cohort | age | predictors...
+            1  |      a |   3 | ...
+            2  |      b |   7 | ...
+            3  |      a |   4 | ...
+            ...
 
         :return: dict
             Return zipped values of population and nnumber of individuals lost
@@ -92,22 +92,22 @@ class DataHandler(object):
 
         pairs = {}
 
-        for (cat1, sd1), (cat2, sd2) in zip(d1.items(), d2.items()):
-
-            # Is this necessary? Can they be off sync?
-            assert cat1 == cat2
+        # Loop over categories and zip the lists
+        for category in self.category:
 
             # Add cat if not in pairs
-            if cat1 not in pairs:
-                pairs[cat1] = {}
+            if category not in pairs:
+                pairs[category] = {}
 
-            for (val1, v1), (val2, v2) in zip(sd1.items(), sd2.items()):
+            # All common values
+            val_keys = set(d1[category]).intersection(set(d2[category]))
 
-                # Is this necessary? Can they be off sync?
-                assert val1 == val2
+            # Loop over values and zip the lists
+            for value in val_keys:
 
                 # Zip cohort_pop - cohort_lost pairs together.
-                pairs[cat1][val1] = zip(v1, v2)
+                pairs[category][value] = list(zip(d1[category][value],
+                                                  d2[category][value]))
 
         return pairs
 
@@ -129,6 +129,15 @@ class DataHandler(object):
         given time period per cohort. The aggregation can be done globally,
         only discriminating the cohorts, or it can be done by predictor (which
         are assumed to be categorical).
+
+        :param data: pandas DataFrame
+            A system level pandas dataframe. Similar to:
+            _______
+            id | cohort | age | predictors...
+            1  |      a |   3 | ...
+            2  |      b |   7 | ...
+            3  |      a |   4 | ...
+            ...
 
         :return: dict
             A dictionary with predictor: list of cohort population pairs. If no
@@ -246,8 +255,8 @@ class DataHandler(object):
         lost_dict = {category: {val: [] for val in data[category]}
                      for category in data}
 
-        for category, val_dicts in data.iteritems():
-            for val, cohorts in val_dicts.iteritems():
+        for category, val_dicts in data.items():
+            for val, cohorts in val_dicts.items():
 
                 for cohort in cohorts:
                     # Initialize with None and calculate subsequent months.

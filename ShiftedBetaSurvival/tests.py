@@ -1,3 +1,4 @@
+from __future__ import print_function
 import pandas
 import numpy
 
@@ -58,23 +59,25 @@ def make_raw_article_data():
 
 
 def format_article_data(data):
-    dh = DataHandler(data, 'cohort', 'age', ['category'])
+    dh = DataHandler('cohort', 'age', ['category'])
 
-    #print dh.aggregate()
-    #print dh.n_lost(dh.aggregate())
-    #print dh.paired_data()
-    return dh.paired_data()
+    #print(h.aggregate())
+    #print(h.n_lost(dh.aggregate()))
+    #print(h.paired_data())
+    return dh.paired_data(data)
 
 def init_shifted_beta(data):
     sb = ShiftedBeta(data, verbose=True)
 
-    print sb.categories, sb.n_cats
-    #print sb.imap
-    #print sb.data
+    print(sb.categories, sb.n_cats)
+    print(sb.imap)
+
+    print(sb.alpha, sb.beta)
+
     sb.fit(restarts=3)
-    print sb.categories
-    print sb.get_coeffs()
-    print sb.get_params()
+    print(sb.categories)
+    print(sb.get_coeffs())
+    print(sb.get_params())
 
 def run_paper_tests():
     paper = make_raw_article_data()
@@ -83,55 +86,60 @@ def run_paper_tests():
     sb = ShiftedBeta(pairs)
     sb.fit()
 
-    print sb.get_coeffs()
-    print sb.get_params()
+    print(sb.get_coeffs())
+    print(sb.get_params())
 
 def test_big_class():
     paper = make_raw_article_data()
-    # print paper.head()
+    # print(aper.head())
 
     sbv = ShiftedBetaSurvival('cohort', 'age', category='category', gamma=1, verbose=1)
     sbv.fit(paper)
 
-    print sbv.summary()
+    print(sbv.summary())
 
-    print sbv.ltv()
+    print(sbv.ltv())
 
-    print
-    print sbv.churn_p_of_t()
-    print sbv.survival_function(renewals=1)
+    print()
+    print(sbv.churn_p_of_t())
+    print(sbv.survival_function(renewals=1))
 
 
 def format_data_test(data_raw):
 
     data = pandas.DataFrame(data=data_raw, columns=['cohort', 'kind', 'age'])
     dh = DataHandler(data, 'cohort', 'age', ['kind'])
-    print dh.aggregate()
-    print dh.n_lost(dh.aggregate())
+    print(dh.aggregate())
+    print(dh.n_lost(dh.aggregate()))
 
 def big_real_data():
 
-    data = pandas.read_csv('./data/data.csv', nrows=2500)
+    data = pandas.read_csv('./data/data.csv', nrows=5000)
 
     sbv = ShiftedBetaSurvival(cohort='cohort', age='age', category=['il1', 'frequency'],
                               gamma=1e-8, verbose=True)
     sbv.fit(data, restarts=2)
 
-    print sbv.summary()
-    print
+    print(sbv.summary())
+    print()
+    print(data.iloc[:20])
+    print(sbv.predict_ltv(data.iloc[:20], arpu=20))
+    # print(ata.iloc[:20].apply(lambda row: sbv._predict_coefficients(row), axis=1))
 
-    print data.iloc[:20]
-    print sbv.predict_ltv(data.iloc[:20], arpu=20)
-    # print data.iloc[:20].apply(lambda row: sbv._predict_coefficients(row), axis=1)
-
-    print sbv._coefficients_combination()
+    print(sbv._coefficients_combination())
 
 if __name__ == '__main__':
 
-    # data = format_article_data(make_raw_article_data())
-    # init_shifted_beta(data)
+    #data = format_article_data(make_raw_article_data())
+    #for c, v in data.items():
+    #    for cc, vv in v.items():
+    #        for vvv in vv:
+    #            print(c, cc, vvv)
+    #init_shifted_beta(data)
     # run_paper_tests()
     # format_data_test(data_raw)
-    test_big_class()
-    #big_real_data()
+    # test_big_class()
+    # big_real_data()
+    # test_big_class()
+    big_real_data()
 
