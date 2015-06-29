@@ -76,7 +76,6 @@ class ShiftedBeta(object):
             A list with probability of churning for all periods from month
             zero to num_periods.
         """
-
         # Initialize list with t = 0 and t = 1 values
         p = [None, alpha / (alpha + beta)]
         s = [None, 1. - p[1]]
@@ -138,23 +137,20 @@ class ShiftedBeta(object):
         # is a better choice.
         l2_reg = self.gamma * (sum(wa[0:]**2) + sum(wb[0:]**2))
 
-        print(wa, wb, l2_reg, end=", ")
+        # update ll with regularization val.
+        log_like -= l2_reg
 
         # get real alpha and beta
         alpha, beta = self._compute_alpha_beta(X, wa, wb)
 
+        # loop over data doing stuff
         for y, z, a, b in zip(age, alive, alpha, beta):
 
             # add contribution of current customer to likelihood
             log_like += numpy.log(self._recursive_retention_stats(a, b, y, z))
-            #print(log_like, y, z, a, b, end=", ")
-
-
-        log_like -= l2_reg
-        print(log_like)
 
         # Negative log_like since we will use scipy's minimize object.
-        return -log_like
+        return -max(min(log_like, 1e9), -1e9)
 
     def fit(self, age, alive, X=None, restarts=50):
 
@@ -189,7 +185,7 @@ class ShiftedBeta(object):
                                                     wa=p[:X.shape[1]],
                                                     wb=p[X.shape[1]:]),
                                guess,
-                               bounds=[(-10, 10)] * X.shape[1] * 2
+                               bounds=[(None, None)] * X.shape[1] * 2
                                )
 
             # If first run...
@@ -202,13 +198,9 @@ class ShiftedBeta(object):
                 optimal = new_opt.fun
                 self.opt = new_opt.x
 
-            print('GUESS: ', guess, self.opt, optimal)
-
             if self.verbose:
                 print("Maximization step "
                       "{0:{2}} of {1:{2}} completed".format(step + 1,
                                                             restarts,
                                                             print_space), end=" ")
                 print("with LogLikelihood: {0}".format(optimal))
-
-        # --- Update values of alpha and beta related coefficients ---

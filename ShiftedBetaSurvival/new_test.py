@@ -50,7 +50,7 @@ def make_raw_article_data():
 
 def sb_test(x, y, z):
 
-    sb = ShiftedBeta(verbose=True, gamma=1e-10)
+    sb = ShiftedBeta(verbose=True, gamma=1e-4)
 
     #wa = numpy.asarray([-0.40346710544549125, 0.05249018262139654])
     #wb = numpy.asarray([1.3365787688739577, -1.1693708498900512])
@@ -61,15 +61,15 @@ def sb_test(x, y, z):
     #print(sb._logp(numpy.concatenate((numpy.ones((x.shape[0], 1)), x), axis=1), y, z, wa, wb))
     #print(sb._logp(numpy.ones((y.shape[0], 1)), y, z, wa, wb))
 
-    sb.fit(y, z, restarts=2)
-    #print(sb.opt, numpy.exp(sb.opt))
+    sb.fit(y, z, x, restarts=2)
+    print(sb.opt, numpy.exp(sb.opt))
 
 
 
 if __name__ == '__main__':
     # sb_test(xraw, yraw, zraw)
 
-    data = make_raw_article_data().iloc[:1000]
+    data = make_raw_article_data().iloc[:]
     sb_test(data[['category']], data['age'], data['alive'])
 
     #print(make_raw_article_data())
