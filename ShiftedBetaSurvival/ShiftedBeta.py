@@ -31,6 +31,9 @@ class ShiftedBeta(object):
 
     def __init__(self, gamma=1.0, add_bias=True, verbose=False):
 
+        self.alpha = None
+        self.beta = None
+
         # regularizer
         if gamma < 0:
             raise ValueError("The regularization constant gamma must be a "
@@ -97,6 +100,13 @@ class ShiftedBeta(object):
 
     @staticmethod
     def _compute_alpha_beta(X, alpha, beta):
+        """
+
+        :param X:
+        :param alpha:
+        :param beta:
+        :return:
+        """
 
         alpha_weights = (alpha * X).sum(axis=1)
         beta_weights = (beta * X).sum(axis=1)
@@ -108,16 +118,13 @@ class ShiftedBeta(object):
         The LogLikelihood function. Given the data and relevant
         variables this function computed the loglikelihood.
 
-        :param alpha: array
-            aaa
-
-        :param alpha: array
-            bbb
-
-        :return: Float
-            Minus the LogLikelihood of the model.
+        :param X:
+        :param age:
+        :param alive:
+        :param wa:
+        :param wb:
+        :return:
         """
-
         # --- LogLikelihood (One Cohort at a Time) --- #
         # We calculate the LogLikelihood for each cohort separately and
         # combining them. From appendix B in [1] it is easy to see that
@@ -135,7 +142,7 @@ class ShiftedBeta(object):
         # are not subject to regularization. Also, think whether this is the
         # best way of handling this, or whether adding a dedicated intercept
         # is a better choice.
-        l2_reg = self.gamma * (sum(wa[0:]**2) + sum(wb[0:]**2))
+        l2_reg = self.gamma * (sum(wa[1:]**2) + sum(wb[1:]**2))
 
         # update ll with regularization val.
         log_like -= l2_reg
@@ -143,14 +150,20 @@ class ShiftedBeta(object):
         # get real alpha and beta
         alpha, beta = self._compute_alpha_beta(X, wa, wb)
 
+        #print(wa, wb, end=", ")
+        count = 0
         # loop over data doing stuff
         for y, z, a, b in zip(age, alive, alpha, beta):
+
+            if count == 500:
+                1#print(log_like)
+            count += 1
 
             # add contribution of current customer to likelihood
             log_like += numpy.log(self._recursive_retention_stats(a, b, y, z))
 
         # Negative log_like since we will use scipy's minimize object.
-        return -max(min(log_like, 1e9), -1e9)
+        return -log_like
 
     def fit(self, age, alive, X=None, restarts=50):
 
@@ -163,8 +176,11 @@ class ShiftedBeta(object):
         elif self.bias:
             X = numpy.concatenate((numpy.ones((X.shape[0], 1)), X), axis=1)
 
+        # Now we have X we can calculate the number of params we need
+        n_params = X.shape[1]
+
         # guesses of initial parameters
-        initial_guesses = 4 * numpy.random.random((restarts, 2 * X.shape[1])) - 4
+        initial_guesses = 0.1 * numpy.random.randn(restarts, 2 * n_params) - 0.01
 
         # Initialize optimal value to None
         # I choose not to set it to, say, zero, or any other number, since I am
@@ -182,10 +198,10 @@ class ShiftedBeta(object):
             new_opt = minimize(lambda p: self._logp(X=X,
                                                     age=age,
                                                     alive=alive,
-                                                    wa=p[:X.shape[1]],
-                                                    wb=p[X.shape[1]:]),
+                                                    wa=p[:n_params],
+                                                    wb=p[n_params:]),
                                guess,
-                               bounds=[(None, None)] * X.shape[1] * 2
+                               bounds=[(None, None)] * n_params * 2
                                )
 
             # If first run...
@@ -204,3 +220,9 @@ class ShiftedBeta(object):
                                                             restarts,
                                                             print_space), end=" ")
                 print("with LogLikelihood: {0}".format(optimal))
+
+        self.alpha = self.opt[:n_params]
+        self.beta = self.opt[n_params:]
+
+    def get_params(self):
+        return self.alpha, self.beta
