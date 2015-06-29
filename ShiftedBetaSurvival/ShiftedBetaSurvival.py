@@ -29,27 +29,49 @@ class ShiftedBetaSurvival(object):
         :return:
         """
 
-        # Parameters
+        # ORIGINAL DATA
+        # The original dataset is stored in the following two variables.
+        #   df: Original data in its original format
+        # data: Original data transformed into map of category-value -
+        #       (cohort population, population lost) pairs.
         self.df = None
         self.data = None
+
+        # COLUMN'S NAMES
+        # The names of the columns used as cohort, age and category throughout
+        # the code.
         self.cohort = cohort
         self.age = age
         self.category = category
 
-        # ShiftedBeta()
+        # SHIFTED-BETA-GEOMETRIC MODEL
+        # Since the training data is only available at training time (upon
+        # calling .fit(), we must postpone the initialization of the
+        # ShiftedBEta object, so we simple initialize it as None.
         self.sb = None
         self.sb_params = None
 
-        # Create data-handler object
+        # DATA-HANDLER OBJECT
+        # The DataHandler object may be created without the training data, so
+        # we do it here.
         self.dh = DataHandler(cohort=self.cohort,
                               age=self.age,
                               category=self.category)
 
-        # params
+        # Instance parameters used to hold the post-train values of alpha and
+        # beta.
         self.alpha = None
         self.beta = None
 
         # L2 regularizer
+        # The L2 regularization is governed by the size of the parameter gamma.
+        # In the current implementation a value of zero for the regularization
+        # constant is allowed, since the biar of the linear model is not
+        # regularized, and a pathological solution to the optimization problem
+        # is unlikely to happen.
+        # However, negatives values for gamma not only don't make sense, but
+        # they break everything. So we make sure the value of gamma passed is
+        # a resonable one.#
         if gamma < 0:
             raise ValueError("The regularization constant gamma must be a "
                              "non-negative real number. A negative value of"
@@ -63,6 +85,19 @@ class ShiftedBetaSurvival(object):
         self.verbose = verbose
 
     def fit(self, df, restarts=50):
+        """
+        A fit method to train the model.
+
+        :param df: pandas DataFrame
+            A pandas DataFrame with similar schema as the one used to train
+            the model. Similar in the sense that the columns used as cohort,
+            age and categories must match. Extra columns with not affect
+            anything.
+
+        :param restarts: int
+            Number of times to restart the optimization procedure with a
+            different seed, to avoid getting stuck on local maxima.
+        """
 
         # Set a bunch of instance parameters
         self.df = df
