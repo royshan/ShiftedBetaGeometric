@@ -1,6 +1,6 @@
 from __future__ import print_function
 from scipy.optimize import minimize
-from math import log10
+from math import log10, log
 import numpy
 
 
@@ -29,40 +29,7 @@ class ShiftedBeta(object):
         data = [c1, c2, ...]
     """
 
-    def __init__(self, data, gamma=1.0, verbose=False):
-        """
-
-        :param data:
-        :param verbose:
-        :return:
-        """
-
-        self.data = data
-
-        self.categories = {}
-        self.n_cats = 0
-        # What is this? Why I need this?
-        for category in sorted(data.keys()):
-            # enter cat
-            self.categories[category] = []
-
-            for value in sorted(data[category].keys()):
-                self.categories[category].append(value)
-                self.n_cats += 1
-
-        # params constructor, explain!
-        self.imap = {}
-        # construct imap by looping over all category-value combination and
-        # setting a unique boolean array to it. This array will dictate the
-        # combination of weights used in the linear model for this pair.
-        self.imap_constructor()
-
-        # ps
-        self.alpha = {}
-        self.beta = {}
-
-        self.alpha_coeffs = None
-        self.beta_coeffs = None
+    def __init__(self, gamma=1.0, add_bias=True, verbose=False):
 
         # regularizer
         if gamma < 0:
@@ -71,61 +38,17 @@ class ShiftedBeta(object):
                              " {} was passed.".format(gamma))
         self.gamma = gamma
 
+        # bias
+        self.bias = add_bias
+
         # ops obj
         self.opt = None
 
         # verbose param
         self.verbose = verbose
 
-    def imap_constructor(self):
-        """
-        indicator_map constructs a boolean vector indicating which parameters
-        to use for a given predictor.
-
-        alpha and beta paramaters are assumed to be linear combination like:
-
-            alpha = alpha0 + alpha1 * predictor1 + alpha2 * predictor2 + ...
-
-        and similarly for beta. However, as it stands, predictors are
-        one-hot encoded categorical variables, so at any given time at most
-        only two alpha_i are used, the intercept and coefficient of the
-        current predictor. The indicator_map methods takes care of keeping
-        track of that.
-        """
-
-        # Easier to use an index that is added one
-        index = 0
-
-        # For each category in the data turn on a different combination of a
-        # boolean array.
-        for category, values_list in self.categories.items():
-
-            # For each category in the data we turn on a different
-            # combination of a boolean array.
-            self.imap[category] = {}
-
-            for value in values_list:
-
-                # Initial a boolean array as false, with length equal to the
-                # number of available categories.
-                bool_ind = numpy.zeros(self.n_cats, dtype=bool)
-
-                # The intercept (index = 0) is always on.
-                bool_ind[0] = True
-
-                # For any category-value combination but the first, both the
-                # intercept as well as an extra entry are set to True.
-                bool_ind[index] = True
-
-                # Change the instance variable imap in place by adding the
-                # appropriate key: bool array pair.
-                self.imap[category][value] = bool_ind
-
-                # add to index
-                index += 1
-
     @staticmethod
-    def _recursive_retention_stats(alpha, beta, num_periods):
+    def _recursive_retention_stats(alpha, beta, num_periods, alive):
         """
         A function to calculate the expected probabilities recursively.
         Using equation 7 from [1] and the alpha and beta coefficients
@@ -158,18 +81,30 @@ class ShiftedBeta(object):
         p = [None, alpha / (alpha + beta)]
         s = [None, 1. - p[1]]
 
-        for t in range(2, num_periods):
-            # Compute latest p value and appen
-            pt = (beta + t - 2.) / (alpha + beta + t - 1.) * p[t-1]
+        for t in range(2, num_periods + 1):
+            # Compute latest p value and append
+            pt = (beta + t - 2.) / (alpha + beta + t - 1.) * p[t - 1]
             p.append(pt)
 
             # use the most recent appended p value to keep building s
-            s.append(s[t-1] - p[t])
+            s.append(s[t - 1] - p[t])
 
         # finish this...
-        return p, s
+        if alive:
+            # tricky mother fucker index! Pay a lot of attention and explain!!
+            return s[-2]
+        else:
+            return p[-1]
 
-    def _logp(self, alpha, beta):
+    @staticmethod
+    def _compute_alpha_beta(X, alpha, beta):
+
+        alpha_weights = (alpha * X).sum(axis=1)
+        beta_weights = (beta * X).sum(axis=1)
+
+        return numpy.exp(alpha_weights), numpy.exp(beta_weights)
+
+    def _logp(self, X, age, alive, wa, wb):
         """
         The LogLikelihood function. Given the data and relevant
         variables this function computed the loglikelihood.
@@ -195,78 +130,48 @@ class ShiftedBeta(object):
         # but extended to include all cohorts.
         log_like = 0.0
 
-        # loop across categories
-        for category, val_dicts in self.data.items():
-
-            # Loop across values of these categories
-            for value, data in val_dicts.items():
-
-                bool_ind = self.imap[category][value]
-
-                alpha_comb = numpy.exp(alpha[bool_ind].sum())
-                beta_comb = numpy.exp(beta[bool_ind].sum())
-
-                # A loop through each element in the data list. Remember that
-                # each element correspond to a particular cohort data. The loop
-                # simply carries out the calculation in B3, appendix B, [1].
-                for i, val in enumerate(data):
-
-                    # The number of customer that are still active and the
-                    # number of customers lost at each month for which cohort
-                    # data is available.
-                    active, lost = val
-
-                    # Since the original dataset was augmented earlier in this
-                    # method, we must specify the point at which the
-                    # calculations performed here should stop. In other words,
-                    # length indicates the point at which actual data is
-                    # available.
-                    length = len(active)
-
-                    # stuff...#
-                    pt, sf = self._recursive_retention_stats(alpha=alpha_comb,
-                                                             beta=beta_comb,
-                                                             num_periods=length)
-
-                    # Likelihood of observing such data given the model.
-                    # Refer to equation B3 for context.
-                    # *** Note that the data is used only up to index length,
-                    # hence avoiding the inclusion of augmented data points.
-                    # ***
-                    died = numpy.log(pt[1:length]) * lost[1:length]
-
-                    # Likelihood of having this many people left after
-                    # some time
-                    still_active = numpy.log(sf[length - 1]) * active[length - 1]
-
-                    # Update the log_like value.
-                    log_like += sum(died) + still_active
-
         # L2 regularizer
         # something about l2 regularization
         # Explain why the intercept (zero-th index portion of alpha and beta)
         # are not subject to regularization. Also, think whether this is the
         # best way of handling this, or whether adding a dedicated intercept
         # is a better choice.
-        l2_reg = self.gamma * (sum(alpha[1:]**2) + sum(beta[1:]**2))
+        l2_reg = self.gamma * (sum(wa[0:]**2) + sum(wb[0:]**2))
+
+        print(wa, wb, l2_reg, end=", ")
+
+        # get real alpha and beta
+        alpha, beta = self._compute_alpha_beta(X, wa, wb)
+
+        for y, z, a, b in zip(age, alive, alpha, beta):
+
+            # add contribution of current customer to likelihood
+            log_like += numpy.log(self._recursive_retention_stats(a, b, y, z))
+            #print(log_like, y, z, a, b, end=", ")
+
+
+        log_like -= l2_reg
+        print(log_like)
 
         # Negative log_like since we will use scipy's minimize object.
-        return -(log_like - l2_reg)
+        return -log_like
 
-    def fit(self, restarts=50):
-        """
+    def fit(self, age, alive, X=None, restarts=50):
 
-        :param restarts:
-        :return:
-        """
         # Free space when printing
         print_space = int(log10(restarts)) + 1
 
+        # Add bias
+        if X is None:
+            X = numpy.ones((age.shape[0], 1))
+        elif self.bias:
+            X = numpy.concatenate((numpy.ones((X.shape[0], 1)), X), axis=1)
+
         # guesses of initial parameters
-        initial_guesses = 4 * numpy.random.random((restarts, 2 * self.n_cats)) - 3
+        initial_guesses = 4 * numpy.random.random((restarts, 2 * X.shape[1])) - 4
 
         # Initialize optimal value to None
-        # I choose not to set it a, say, zero, or any other number, since I am
+        # I choose not to set it to, say, zero, or any other number, since I am
         # not sure that the log-likelihood is bounded in anyway. So is better to
         # initialize with None and use the first optimal value start the ball
         # rolling.
@@ -278,10 +183,13 @@ class ShiftedBeta(object):
 
             # --- Optimization
             # something...
-            new_opt = minimize(lambda p: self._logp(p[:self.n_cats],
-                                                    p[self.n_cats:]),
+            new_opt = minimize(lambda p: self._logp(X=X,
+                                                    age=age,
+                                                    alive=alive,
+                                                    wa=p[:X.shape[1]],
+                                                    wb=p[X.shape[1]:]),
                                guess,
-                               bounds=[(None, None)] * 2 * self.n_cats
+                               bounds=[(-10, 10)] * X.shape[1] * 2
                                )
 
             # If first run...
@@ -294,6 +202,8 @@ class ShiftedBeta(object):
                 optimal = new_opt.fun
                 self.opt = new_opt.x
 
+            print('GUESS: ', guess, self.opt, optimal)
+
             if self.verbose:
                 print("Maximization step "
                       "{0:{2}} of {1:{2}} completed".format(step + 1,
@@ -302,61 +212,3 @@ class ShiftedBeta(object):
                 print("with LogLikelihood: {0}".format(optimal))
 
         # --- Update values of alpha and beta related coefficients ---
-
-        # The full, raw coefficient arrays
-        self.alpha_coeffs = self.opt[:self.n_cats]
-        self.beta_coeffs = self.opt[self.n_cats:]
-
-        # Categories and their corresponding values
-        for category, val_list in self.categories.items():
-
-            # Initialize with empty dict
-            self.alpha[category] = {}
-            self.beta[category] = {}
-
-            # Values list
-            for value in val_list:
-
-                # Is boolean ideal?
-                bool_ind = self.imap[category][value]
-
-                self.alpha[category][value] = numpy.exp(self.opt[:self.n_cats][bool_ind].sum())
-                self.beta[category][value] = numpy.exp(self.opt[self.n_cats:][bool_ind].sum())
-
-    def get_coeffs(self):
-        """
-
-        :return:
-        """
-
-        # gets alpha and beta...
-        coeffs = {}
-
-        # Categories and their corresponding values
-        for category, val_list in self.categories.items():
-
-            # Initialize with empty dict
-            coeffs[category] = {}
-
-            # Values list
-            for value in val_list:
-                coeffs[category][value] = dict(alpha=self.alpha[category][value],
-                                               beta=self.beta[category][value])
-
-        return coeffs
-
-    def get_params(self):
-        """
-
-        :return:
-        """
-
-        # simple dict of stuff
-        params = dict(n_categories=self.n_cats,
-                      categories=self.categories,
-                      imap=self.imap,
-                      coeffs=dict(alpha=self.alpha_coeffs,
-                                  beta=self.beta_coeffs)
-                      )
-
-        return params
