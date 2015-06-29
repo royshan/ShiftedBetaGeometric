@@ -214,7 +214,12 @@ class DataHandler(object):
 
         for name, df in data.groupby(cohort_field):
 
-            cdata = numpy.zeros(df[age_field].max(), dtype=int)
+            cohort_lifetime = df[age_field].max()
+
+            if cohort_lifetime < 2:
+                continue
+
+            cdata = numpy.zeros(cohort_lifetime, dtype=int)
 
             for index, row in df.iterrows():
 
