@@ -79,9 +79,12 @@ class ShiftedBeta(object):
             A list with probability of churning for all periods from month
             zero to num_periods.
         """
+        alpha = max(min(alpha, 25), 0.0001)
+        beta = max(min(beta, 25), 0.0001)
+
         # Initialize list with t = 0 and t = 1 values
         p = [None, alpha / (alpha + beta)]
-        s = [None, 1. - p[1]]
+        s = [1., 1. - p[1]]
 
         for t in range(2, num_periods + 1):
             # Compute latest p value and append
@@ -94,8 +97,10 @@ class ShiftedBeta(object):
         # finish this...
         if alive:
             # tricky mother fucker index! Pay a lot of attention and explain!!
+            #return s[1]
             return s[-2]
         else:
+            #return p[1]
             return p[-1]
 
     @staticmethod
@@ -150,14 +155,8 @@ class ShiftedBeta(object):
         # get real alpha and beta
         alpha, beta = self._compute_alpha_beta(X, wa, wb)
 
-        #print(wa, wb, end=", ")
-        count = 0
         # loop over data doing stuff
         for y, z, a, b in zip(age, alive, alpha, beta):
-
-            if count == 500:
-                1#print(log_like)
-            count += 1
 
             # add contribution of current customer to likelihood
             log_like += numpy.log(self._recursive_retention_stats(a, b, y, z))

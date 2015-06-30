@@ -56,18 +56,22 @@ def sb_test(x, y, z):
     #wb = numpy.asarray([1.3365787688739577, -1.1693708498900512])
 
     sb.fit(y, z, x, restarts=2)
-    print(sb.opt, numpy.exp(sb.opt))
+    print(sb.opt, numpy.exp(sb.opt), numpy.exp(sb.alpha[0]) / (numpy.exp(sb.alpha[0]) +
+                                                       numpy.exp(sb.beta[0])))
 
 
 def sb_test2():
 
-    data = pandas.read_csv('../data/new_data.csv', nrows=1000)
+    data = pandas.read_csv('../data/new_data.csv', nrows=100000)
 
-    x = data.values[:, [1, 2, 3, 4, 5, 6, 7]]
+    print(data.head())
+
+    #x = data.values[:, [0, 2, 3, 4, 5, 6, 7]]
+    x = data.values[:, :-3]
     y = data.values[:, -2].astype(int)
     z = data.values[:, -1].astype(int)
 
-    sb = ShiftedBeta(verbose=True, gamma=1e3)
+    sb = ShiftedBeta(verbose=True, gamma=1e2)
 
     sb.fit(y, z, x, restarts=1)
     print(sb.alpha, sb.beta, numpy.exp(sb.alpha[0]) / (numpy.exp(sb.alpha[0]) +
@@ -77,10 +81,10 @@ def sb_test2():
 
 
 if __name__ == '__main__':
-    # sb_test(xraw, yraw, zraw)
 
-    data = make_raw_article_data().iloc[:]
-    sb_test(data[['category']], data['age'], data['alive'])
+    # sb_test(xraw, yraw, zraw)
+    #data = make_raw_article_data().iloc[:]
+    #sb_test(data[['category']], data['age'], data['alive'])
 
     sb_test2()
 
