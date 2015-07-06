@@ -1,4 +1,5 @@
 from __future__ import print_function
+from datetime import datetime
 import pandas
 import numpy
 
@@ -67,7 +68,7 @@ def sb_test2():
     print(data.head())
 
     #x = data.values[:, [0, 2, 3, 4, 5, 6, 7]]
-    x = data.values[:, :-3]
+    x = data.values[:, :-2]
     y = data.values[:, -2].astype(int)
     z = data.values[:, -1].astype(int)
 
@@ -82,6 +83,8 @@ def sb_test2():
 
 if __name__ == '__main__':
 
+    start = datetime.now()
+
     # sb_test(xraw, yraw, zraw)
     #data = make_raw_article_data().iloc[:]
     #sb_test(data[['category']], data['age'], data['alive'])
@@ -89,3 +92,5 @@ if __name__ == '__main__':
     sb_test2()
 
     #print(make_raw_article_data())
+
+    print("main took: {}".format(datetime.now() - start))

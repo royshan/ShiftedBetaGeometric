@@ -1,6 +1,56 @@
 import numpy
 
 
+class CategoryEncoder(object):
+    """
+    object to take a pandas dataset and return a numpy array with categorical
+    variables one-hot-encoded. Additionally the age and alive fields should be
+    automatically parsed too.
+
+    should it try to infer stuff automatically?
+    """
+
+    def __init__(self, age, alive, predictors=None, categorical=None):
+
+        self.age = age
+        self.alive = alive
+
+        # If the category name was passed as a single string, we turn it into
+        # a list of one element (not list of characters, as you would get with
+        # list('abc').
+        if isinstance(predictors, str):
+            predictors = [predictors]
+        # Try to explicitly transform category to a list (perhaps it was passed
+        # as a tuple or something. If it was None to begin with, we catch a
+        # TypeError and move on.
+        try:
+            self.predictos = sorted(predictors)
+        except TypeError:
+            self.predictos = None
+
+        # If the category name was passed as a single string, we turn it into
+        # a list of one element (not list of characters, as you would get with
+        # list('abc').
+        if isinstance(categorical, str):
+            categorical = [categorical]
+        # Try to explicitly transform category to a list (perhaps it was passed
+        # as a tuple or something. If it was None to begin with, we catch a
+        # TypeError and move on.
+        try:
+            self.categorical = sorted(categorical)
+        except TypeError:
+            self.categorical = None
+
+    def transform(self, df):
+        pass
+
+    def label_encoder(self):
+        pass
+
+    def one_hot_encoder(self):
+        pass
+
+
 class DataHandler(object):
     """
     DataHandler is an object to perform several manipulations to a pandas
@@ -17,7 +67,7 @@ class DataHandler(object):
     DataHandler turns it into a dictionary with key: list of cohort
     populations, key-value pairs.
 
-    Additionally it can compute the number of idividuals lost per cohort
+    Additionally it can compute the number of individuals lost per cohort
     returning a similar dictionary as above with key: number of lost
     individuals pairs.
 
