@@ -68,11 +68,11 @@ def sb_test2():
     print(data.head())
 
     #x = data.values[:, [0, 2, 3, 4, 5, 6, 7]]
-    x = data.values[:, :-2]
+    x = data.values[:, :-3]
     y = data.values[:, -2].astype(int)
     z = data.values[:, -1].astype(int)
 
-    sb = ShiftedBeta(verbose=True, gamma=1e2)
+    sb = ShiftedBeta(verbose=True, gamma=1e-2)
 
     sb.fit(y, z, x, restarts=1)
     print(sb.alpha, sb.beta, numpy.exp(sb.alpha[0]) / (numpy.exp(sb.alpha[0]) +
