@@ -29,7 +29,7 @@ class ShiftedBeta(object):
         data = [c1, c2, ...]
     """
 
-    def __init__(self, gamma=1.0, add_bias=True, verbose=False):
+    def __init__(self, gamma=1.0, gamma_ratio=1.0, add_bias=True, verbose=False):
 
         self.alpha = None
         self.beta = None
@@ -40,6 +40,10 @@ class ShiftedBeta(object):
                              "non-negative real number. A negative value of"
                              " {} was passed.".format(gamma))
         self.gamma = gamma
+        # different regularization parameters for alpha and beta can be helpful
+        # so we include a ratio parameters that allows them to be set
+        # differently
+        self.gamma_ratio = gamma_ratio
 
         # bias
         self.bias = add_bias
@@ -147,7 +151,8 @@ class ShiftedBeta(object):
         # are not subject to regularization. Also, think whether this is the
         # best way of handling this, or whether adding a dedicated intercept
         # is a better choice.
-        l2_reg = self.gamma * (sum(wa[1:]**2) + sum(wb[1:]**2))
+        l2_reg = self.gamma * (sum(wa[1:]**2) + self.gamma_ratio * sum(wb[1:]**2))
+        #l2_reg = self.gamma * (sum(abs(wa[1:])) + sum(abs(wb[1:])))
 
         # update ll with regularization val.
         log_like -= l2_reg
