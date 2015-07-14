@@ -30,7 +30,7 @@ def print_stats(am, bm, index, names):
 
     a = numpy.exp(a)
     b = numpy.exp(b)
-    print('{0:15} | {1:5.5}, {2:5.5}, {3:5.5}'.format(pname, a, b, a / (a + b)))
+    print('{0:20} | {1:5.5}, {2:5.5}, {3:5.5}'.format(pname, a, b, a / (a + b)))
 
 
 def make_raw_article_data():
@@ -67,7 +67,7 @@ def make_raw_article_data():
 
 def sb_test(x, y, z, names):
 
-    sb = ShiftedBeta(verbose=True, gamma=1e2, gamma_ratio=1.)
+    sb = ShiftedBeta(verbose=True, gamma_alpha=1e2, gamma_ratio=1.)
 
     #wa = numpy.asarray([-0.40346710544549125, 0.05249018262139654])
     #wb = numpy.asarray([1.3365787688739577, -1.1693708498900512])
@@ -110,7 +110,7 @@ def sb_test2():
 
     print("Average age: {0:2} | Average still alive: {1:0.3}".format(y.mean(), z.mean()))
 
-    sb = ShiftedBeta(verbose=True, gamma=5e2, gamma_ratio=0.1)
+    sb = ShiftedBeta(verbose=True, gamma_alpha=5e2, gamma_ratio=0.1)
 
     sb.fit(y, z, x, restarts=1)
     print(sb.alpha, numpy.exp(sb.alpha[0]), numpy.exp(sb.alpha.sum()))
@@ -123,7 +123,7 @@ def sb_test2():
 
 def sb_test3():
 
-    data = pandas.read_csv('../data/data_2015.csv')
+    data = pandas.read_csv('../data/data_fullyear.csv')
     total_size = data.shape[0]
     index = numpy.arange(data.shape[0])
     numpy.random.shuffle(index)
@@ -132,15 +132,15 @@ def sb_test3():
     data = data.iloc[index]
     data.index = numpy.arange(total_size)
 
-    names = []
+    names = ['freshapp', 'mobile', 'fic']
 
-    x = None
+    x = data[names].values
     y = data.values[:, -2].astype(int)
     z = data.values[:, -1].astype(int)
 
     names = ['bias'] + names
 
-    sb = ShiftedBeta(verbose=True, gamma=5e2, gamma_ratio=0.1)
+    sb = ShiftedBeta(verbose=True, gamma_alpha=1e1, gamma_beta=1e1)
     sb.fit(y, z, x, restarts=1)
 
     print_stats(sb.alpha, sb.beta, [0], names)

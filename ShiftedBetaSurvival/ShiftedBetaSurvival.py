@@ -105,7 +105,7 @@ class ShiftedBetaSurvival(object):
 
         # create shifted beta object
         self.sb = ShiftedBeta(self.data,
-                              gamma=self.gamma,
+                              gamma_alpha=self.gamma,
                               verbose=self.verbose)
 
         # fit to data!
