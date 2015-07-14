@@ -121,6 +121,33 @@ def sb_test2():
         print_stats(sb.alpha, sb.beta, [0, i], names)
 
 
+def sb_test3():
+
+    data = pandas.read_csv('../data/data_2015.csv')
+    total_size = data.shape[0]
+    index = numpy.arange(data.shape[0])
+    numpy.random.shuffle(index)
+    index = index[:total_size]
+
+    data = data.iloc[index]
+    data.index = numpy.arange(total_size)
+
+    names = []
+
+    x = None
+    y = data.values[:, -2].astype(int)
+    z = data.values[:, -1].astype(int)
+
+    names = ['bias'] + names
+
+    sb = ShiftedBeta(verbose=True, gamma=5e2, gamma_ratio=0.1)
+    sb.fit(y, z, x, restarts=1)
+
+    print_stats(sb.alpha, sb.beta, [0], names)
+    for i in range(1, len(names)):
+        print_stats(sb.alpha, sb.beta, [0, i], names)
+
+
 if __name__ == '__main__':
 
     start = datetime.now()
@@ -131,6 +158,7 @@ if __name__ == '__main__':
     #names = ['bias', 'category', 'random']
     #sb_test(data[['category', 'random']], data['age'], data['alive'], names)
 
-    sb_test2()
+    #sb_test2()
+    sb_test3()
 
     print("main took: {}".format(datetime.now() - start))

@@ -151,8 +151,8 @@ class ShiftedBeta(object):
         # are not subject to regularization. Also, think whether this is the
         # best way of handling this, or whether adding a dedicated intercept
         # is a better choice.
-        l2_reg = self.gamma * (sum(wa[1:]**2) + self.gamma_ratio * sum(wb[1:]**2))
-        #l2_reg = self.gamma * (sum(abs(wa[1:])) + sum(abs(wb[1:])))
+        l2_reg = self.gamma * (sum(wa[1:]**2) +
+                               self.gamma_ratio * sum(wb[1:]**2))
 
         # update ll with regularization val.
         log_like -= l2_reg
