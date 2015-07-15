@@ -366,10 +366,6 @@ class ShiftedBeta(object):
         except TypeError:
             age = age * numpy.ones(self.n_samples, dtype=int)
 
-        # age cannot be negative!
-        if min(age) < 0:
-            raise ValueError("All ages must be non-negative.")
-
         # --- Initialize Output ---
         # Initialize the output as a matrix of zeros. The number of rows is
         # given by the total number of samples, while the number of columns
@@ -381,6 +377,8 @@ class ShiftedBeta(object):
         # sort this whole age thing out!
         outputs[:, 0][age < 1] = True
         outputs[:, 1][age < 2] = True
+
+        print(outputs)
 
         # --- Fill output recursively (see eq.7 in [1]) ---
 
@@ -404,7 +402,6 @@ class ShiftedBeta(object):
             rows = (period >= age) & (period < (age + n_periods))
             outputs[:, period][rows] += 1
 
-        # Return only the appropriate values and reshape the matrix.
         return p_churn_matrix[outputs].reshape((self.n_samples, n_periods))
 
     def survival_function(self, X=None, age=1,  n_periods=12):
@@ -445,6 +442,7 @@ class ShiftedBeta(object):
         try:
             num_periods = int(max(age) + n_periods)
             assert len(age) == self.n_samples
+
         except TypeError:
             age = age * numpy.ones(self.n_samples, dtype=int)
             num_periods = int(max(age) + n_periods)

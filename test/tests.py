@@ -127,7 +127,7 @@ def sb_test2():
 def sb_test3():
 
     data = pandas.read_csv('../data/data_2yr.csv')
-    total_size = 5000#data.shape[0]
+    total_size = 50#data.shape[0]
     index = numpy.arange(data.shape[0])
     numpy.random.shuffle(index)
     index = index[:total_size]
@@ -157,11 +157,15 @@ def sb_test3():
     preds['beta'] = preds_coeff[:, 1]
     preds['churn'] = preds_coeff[:, 0] / (preds_coeff[:, 0] + preds_coeff[:, 1])
 
-    print(sb.derl(x, y, z).shape)
+    #print(sb.derl(x, y, z).shape)
 
-    print(sb.churn_p_of_t(x, y, n_periods=6))
-    print(sb.survival_function(x, y, n_periods=6))
-    print(sb.survival_function(x, 1, n_periods=12))
+    #print(sb.churn_p_of_t(x, y, n_periods=6))
+
+    ages = numpy.ones(50, dtype=int)
+    ages[25:] += 3
+    print(sb.churn_p_of_t(x, ages, n_periods=6))
+    #print(sb.survival_function(X=x, age=y, n_periods=6))
+    #print(sb.survival_function(X=x, age=2, n_periods=12))
 
 
 def sbs_test():
@@ -179,17 +183,14 @@ def sbs_test():
                               alive='alive',
                               features=['freshapp', 'annual'],
                               verbose=True)
-
     sbs.fit(data)
 
     print()
     print(sbs.summary())
-
     print(sbs.predict_ltv(data, 'system_key'))
 
 
 if __name__ == '__main__':
-
     start = datetime.now()
 
     #data = make_raw_article_data().iloc[:]
