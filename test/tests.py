@@ -127,7 +127,7 @@ def sb_test2():
 def sb_test3():
 
     data = pandas.read_csv('../data/data_2yr.csv')
-    total_size = 1000#data.shape[0]
+    total_size = 5000#data.shape[0]
     index = numpy.arange(data.shape[0])
     numpy.random.shuffle(index)
     index = index[:total_size]
@@ -145,7 +145,7 @@ def sb_test3():
     names = ['bias'] + names
 
     sb = ShiftedBeta(verbose=True, gamma_alpha=1e1, gamma_beta=1e1)
-    sb.fit(y, z, x, restarts=5)
+    sb.fit(y, z, x, restarts=3)
 
     print_stats(sb.alpha, sb.beta, [0], names)
     for i in range(1, len(names)):
@@ -157,8 +157,11 @@ def sb_test3():
     preds['beta'] = preds_coeff[:, 1]
     preds['churn'] = preds_coeff[:, 0] / (preds_coeff[:, 0] + preds_coeff[:, 1])
 
-    #print(x[:20])
-    #print(preds.iloc[:20])
+    print(sb.derl(x, y, z).shape)
+
+    print(sb.churn_p_of_t(x, y, n_periods=6))
+    print(sb.survival_function(x, y, n_periods=6))
+
 
 def sbs_test():
 
@@ -194,7 +197,7 @@ if __name__ == '__main__':
     #sb_test(data[['category', 'random']], data['age'], data['alive'], names)
 
     #sb_test2()
-    #sb_test3()
-    sbs_test()
+    sb_test3()
+    #sbs_test()
 
     print("main took: {}".format(datetime.now() - start))
