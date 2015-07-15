@@ -362,7 +362,10 @@ class ShiftedBeta(object):
         beta = params[:, 1]
 
         try:
-            assert len(age) == self.n_samples
+            if X is not None:
+                assert len(age) == X.shape[0]
+            else:
+                assert len(age) == self.n_samples
         except TypeError:
             age = age * numpy.ones(self.n_samples, dtype=int)
 
@@ -444,7 +447,11 @@ class ShiftedBeta(object):
         # get number of periods
         try:
             num_periods = int(max(age) + n_periods)
-            assert len(age) == self.n_samples
+
+            if X is not None:
+                assert len(age) == X.shape[0]
+            else:
+                assert len(age) == self.n_samples
         except TypeError:
             age = age * numpy.ones(self.n_samples, dtype=int)
             num_periods = int(max(age) + n_periods)

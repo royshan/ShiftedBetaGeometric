@@ -3,6 +3,10 @@ from datetime import datetime
 import pandas
 import numpy
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set_style("darkgrid")
+
 import sys
 sys.path.append('../shifted_beta_survival/')
 from ShiftedBetaSurvival import ShiftedBetaSurvival
@@ -66,6 +70,28 @@ def make_raw_article_data():
     data = pandas.DataFrame(data=out_data, columns=['id', 'cohort', 'category', 'age', 'alive'])
 
     return data
+
+
+def article_data(copies=1, random=False):
+
+    one_data = make_raw_article_data()
+
+    data = one_data.copy()
+    for i in range(1, copies):
+        data = pandas.concat([data, one_data], axis=0)
+
+    if random:
+        data.insert(1, 'random', numpy.random.randint(0, 2, (data.shape[0], 1)))
+        x = data[['category', 'random']].values
+        names = ['bias', 'category', 'random']
+    else:
+        x = data[['category']].values
+        names = ['bias', 'category']
+
+    y = data.values[:, -2].astype(int)
+    z = data.values[:, -1].astype(int)
+
+    return x, y, z, names
 
 
 def sb_test(x, y, z, names):
@@ -168,6 +194,34 @@ def sb_test3():
     #print(sb.survival_function(X=x, age=2, n_periods=12))
 
 
+def surv_plot():
+
+    x, y, z, names = article_data(copies=2, random=False)
+
+    sb = ShiftedBeta(verbose=True, gamma_alpha=1e-1, gamma_beta=1e-1)
+    sb.fit(y, z, x, restarts=1)
+
+    print_stats(sb.alpha, sb.beta, [0], names)
+    for i in range(1, len(names)):
+        print_stats(sb.alpha, sb.beta, [0, i], names)
+
+    s = sb.survival_function(x[[0, -1], :], numpy.array([1, 1]), n_periods=13)
+
+    fig = plt.figure(figsize=(16, 10))
+    graph = fig.add_subplot(111)
+
+    for x_val, sf in zip(x[[0, -1], :], s):
+        if x_val[0] == 1:
+            plt.plot(sf, alpha=0.5, color='blue')
+        else:
+            plt.plot(sf, alpha=0.5, color='red')
+
+    plt.title('Empirical and Modelled Survival Curves By Platform', fontsize=20)
+    plt.xlabel('Months Since Upgrade')
+    plt.ylabel('S(t)')
+    plt.show()
+
+
 def sbs_test():
 
     data = pandas.read_csv('../data/data_2yr.csv')
@@ -199,7 +253,9 @@ if __name__ == '__main__':
     #sb_test(data[['category', 'random']], data['age'], data['alive'], names)
 
     #sb_test2()
-    sb_test3()
+    #sb_test3()
+    surv_plot()
+
     #sbs_test()
 
     print("main took: {}".format(datetime.now() - start))
