@@ -205,7 +205,11 @@ def surv_plot():
     for i in range(1, len(names)):
         print_stats(sb.alpha, sb.beta, [0, i], names)
 
-    s = sb.survival_function(x[[0, -1], :], numpy.array([1, 1]), n_periods=13)
+    c = sb.churn_p_of_t(x[[0, -1], :], 0, n_periods=13)
+    s = sb.survival_function(x[[0, -1], :], numpy.array([0, 0]), n_periods=13)
+
+    print(c)
+    print(s)
 
     fig = plt.figure(figsize=(16, 10))
     graph = fig.add_subplot(111)

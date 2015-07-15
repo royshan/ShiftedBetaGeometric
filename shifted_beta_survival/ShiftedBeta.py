@@ -331,7 +331,7 @@ class ShiftedBeta(object):
         return arpu * f1 * f2 * alive
 
     def churn_p_of_t(self,
-                     X=None,
+                     X,
                      age=1,
                      n_periods=12):
         """
@@ -361,13 +361,13 @@ class ShiftedBeta(object):
         alpha = params[:, 0]
         beta = params[:, 1]
 
+        # set the number of samples
+        n_samples = X.shape[0]
+
         try:
-            if X is not None:
-                assert len(age) == X.shape[0]
-            else:
-                assert len(age) == self.n_samples
+            len(age) == X.shape[0]
         except TypeError:
-            age = age * numpy.ones(self.n_samples, dtype=int)
+            age = age * numpy.ones(n_samples, dtype=int)
 
         # age cannot be negative!
         if min(age) < 0:
@@ -377,8 +377,8 @@ class ShiftedBeta(object):
         # Initialize the output as a matrix of zeros. The number of rows is
         # given by the total number of samples, while the number of columns
         # is the number of months passed as a parameter.
-        p_churn_matrix = numpy.zeros((self.n_samples, max(age) + n_periods))
-        outputs = numpy.zeros((self.n_samples, max(age) + n_periods),
+        p_churn_matrix = numpy.zeros((n_samples, max(age) + n_periods))
+        outputs = numpy.zeros((n_samples, max(age) + n_periods),
                               dtype=bool)
 
         # sort this whole age thing out!
@@ -408,9 +408,9 @@ class ShiftedBeta(object):
             outputs[:, period][rows] += 1
 
         # Return only the appropriate values and reshape the matrix.
-        return p_churn_matrix[outputs].reshape((self.n_samples, n_periods))
+        return p_churn_matrix[outputs].reshape((n_samples, n_periods))
 
-    def survival_function(self, X=None, age=1,  n_periods=12):
+    def survival_function(self, X, age=1,  n_periods=12):
         """
         survival_function computes the survival curve obtained from the model's
         parameters and assumptions. Using equation 7 from [1] and the alpha and
@@ -444,16 +444,17 @@ class ShiftedBeta(object):
         # which guarantees the churn rate curve extends far enough into the
         # future.#
 
+        # set the number of samples
+        n_samples = X.shape[0]
+
         # get number of periods
         try:
             num_periods = int(max(age) + n_periods)
 
-            if X is not None:
-                assert len(age) == X.shape[0]
-            else:
-                assert len(age) == self.n_samples
+            # is age a list like object?
+            len(age) == X.shape[0]
         except TypeError:
-            age = age * numpy.ones(self.n_samples, dtype=int)
+            age = age * numpy.ones(n_samples, dtype=int)
             num_periods = int(max(age) + n_periods)
 
         # age cannot be negative!
@@ -461,7 +462,7 @@ class ShiftedBeta(object):
             raise ValueError("All ages must be non-negative.")
 
         p_of_t = self.churn_p_of_t(X=X,
-                                   age=1,
+                                   age=0,
                                    n_periods=num_periods)
 
         s = numpy.zeros(p_of_t.shape)
@@ -483,7 +484,7 @@ class ShiftedBeta(object):
             outputs[:, col][rows] += 1
 
         # pick correct entries
-        s = s[outputs].reshape((self.n_samples, n_periods))
+        s = s[outputs].reshape((n_samples, n_periods))
 
         # return the scaled values of s
         return s/s[:, [0]]
