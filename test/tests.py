@@ -145,7 +145,7 @@ def sb_test3():
     names = ['bias'] + names
 
     sb = ShiftedBeta(verbose=True, gamma_alpha=1e1, gamma_beta=1e1)
-    sb.fit(y, z, x, restarts=3)
+    sb.fit(y, z, x, restarts=1)
 
     print_stats(sb.alpha, sb.beta, [0], names)
     for i in range(1, len(names)):
@@ -161,6 +161,7 @@ def sb_test3():
 
     print(sb.churn_p_of_t(x, y, n_periods=6))
     print(sb.survival_function(x, y, n_periods=6))
+    print(sb.survival_function(x, 1, n_periods=12))
 
 
 def sbs_test():
