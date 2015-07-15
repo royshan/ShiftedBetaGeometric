@@ -1,9 +1,10 @@
 from __future__ import print_function
 from scipy.optimize import minimize
-from math import log10
+from math import log10, exp
 from datetime import datetime
 import numpy
 from scipy.special import hyp2f1
+
 
 class ShiftedBeta(object):
     """
@@ -99,8 +100,7 @@ class ShiftedBeta(object):
         beta = max(min(beta, 1e4), 1e-4)
 
         # Initialize list with t = 0 and t = 1 values
-        p_old = None
-        s_old = 1
+        s_old = 1.
 
         p_new = alpha / (alpha + beta)
         s_new = 1. - p_new
@@ -264,46 +264,42 @@ class ShiftedBeta(object):
         computes alpha and beta for a each row of a given matrix x with the
         same shape as the data the model was trained on, obviously.
 
-        :param x:
+        :param X:
         :return:
         """
         #  use this without bias
         if X is None:
-            alpha = numpy.exp(self.alpha[0]) * numpy.ones(self.n_samples)
-            beta = numpy.exp(self.beta[0]) * numpy.ones(self.n_samples)
+            alpha = exp(self.alpha[0]) * numpy.ones(self.n_samples)
+            beta = exp(self.beta[0]) * numpy.ones(self.n_samples)
         else:
             alpha, beta = self._compute_alpha_beta(X,
                                                    self.alpha[1:],
                                                    self.beta[1:])
 
             # add bias contribution
-            alpha *= numpy.exp(self.alpha[0])
-            beta *= numpy.exp(self.beta[0])
+            alpha *= exp(self.alpha[0])
+            beta *= exp(self.beta[0])
 
         return numpy.vstack([alpha, beta]).T
 
     def get_params(self):
         return self.alpha, self.beta
 
-    def derl(self, X=None, age=1, alive=1, arpu=1.0, discount_rate=0.005):
+    def derl(self,
+             X=None,
+             age=1,
+             alive=1,
+             arpu=1.0,
+             discount_rate=0.005):
         """
         Discounted Expected Residual Lifetime, as derived in [2].
         See equation (6).
-
-        :param alpha: float
-            Value of sBG alpha param
-
-        :param beta: float
-            Value of sBG beta param
 
         :param arpu: Float
             Average Revenue Per User
 
         :param discount_rate: Float
             discount rate
-
-        :param renewals: Int
-            customer's contract period (customer has made n-1 renewals)
 
         :return: Float
             The DERL for the above values.
@@ -323,14 +319,17 @@ class ShiftedBeta(object):
 
         return arpu * f1 * f2 * alive
 
-    def churn_p_of_t(self, X=None, age=1, alive=1, n_periods=12):
+    def churn_p_of_t(self,
+                     X=None,
+                     age=1,
+                     n_periods=12):
         """
         churn_p_of_t computes the churn as a function of time curve. Using
         equation 7 from [1] and the alpha and beta coefficients obtained by
         training this model, it computes P(T = t) recursively, returning either
         the expected value or an array of values.
 
-
+        :type X: ndarray
         :param n_periods: Int
             The number of months to compute the curve for
 
@@ -351,13 +350,23 @@ class ShiftedBeta(object):
         alpha = params[:, 0]
         beta = params[:, 1]
 
+        try:
+            assert len(age) == self.n_samples
+        except TypeError:
+            age = numpy.ones(self.n_samples, dtype=int)
+
         # --- Initialize Output ---
         # Initialize the output as a matrix of zeros. The number of rows is
         # given by the total number of samples, while the number of columns
         # is the number of months passed as a parameter.
-        p_churn_matrix = numpy.zeros((self.n_samples, n_periods))
+        p_churn_matrix = numpy.zeros((self.n_samples, max(age) + n_periods))
+        outputs = numpy.zeros((self.n_samples, max(age) + n_periods),
+                              dtype=bool)
 
-        # --- Fill output recursively (see eq.7 in [1])---
+        outputs[:, 0][age < 2] = True
+        outputs[:, 1][age < 1] = True
+
+        # --- Fill output recursively (see eq.7 in [1]) ---
 
         # Start with month one (churn rate of month zero was set to 0 by
         # definition).
@@ -365,19 +374,22 @@ class ShiftedBeta(object):
 
         # Calculate remaining months recursively using the formulas
         # provided in the original paper.
-        for i in range(2, n_periods):
+        for period in range(2, max(age) + n_periods):
 
-            month = i
+            month = period
             update = (beta + month - 2) / (alpha + beta + month - 1)
 
             # None that i + 1 is simply the previous value, since val
             # starts with the third entry in the array, but I starts
             # counting form zero!
-            p_churn_matrix[:, i] += update * p_churn_matrix[:, i - 1]
+            p_churn_matrix[:, period] += update * p_churn_matrix[:, period - 1]
 
-        return p_churn_matrix
+            rows = (period >= age) & (period < (age + n_periods))
+            outputs[:, period][rows] += 1
 
-    def survival_function(self, n_periods=12, renewals=0):
+        return p_churn_matrix[outputs].reshape((self.n_samples, n_periods))
+
+    def survival_function(self, X=None, age=1,  n_periods=12):
         """
         survival_function computes the survival curve obtained from the model's
         parameters and assumptions. Using equation 7 from [1] and the alpha and
@@ -395,16 +407,9 @@ class ShiftedBeta(object):
             false.
         """
         # Spot checks making sure the values passed make sense!
-        if renewals < 0 or not isinstance(renewals, int):
-            raise ValueError("The number of renewals must be a non-zero "
-                             "integer")
-
         if n_periods < 0 or not isinstance(n_periods, int):
             raise ValueError("The number of periods must be a non-zero "
                              "integer")
-
-        if not self.trained:
-            raise RuntimeError('Train the model first!')
 
         # --- Churn Rates ---
         # Start by calling the method churn_p_of_t to calculate the monthly
@@ -417,45 +422,14 @@ class ShiftedBeta(object):
         # n_months + renewals to the n_month parameter of the churn_p_of_t
         # which guarantees the churn rate curve extends far enough into the
         # future.#
-        p_of_t = self.churn_p_of_t(n_periods=n_periods + renewals)
+        p_of_t = self.churn_p_of_t(X=X,
+                                   age=age,
+                                   n_periods=n_periods)
 
-        surv_by_cate = {}
+        s = numpy.zeros(p_of_t.shape)
+        s[:, 0] = 1.
 
-        for category, val_dict in self.sb.get_coeffs().items():
+        for col in range(1, s.shape[1]):
+            s[:, col] = s[:, col - 1] - p_of_t[:, col]
 
-            # add category dict
-            surv_by_cate[category] = {}
-
-            for value, param in val_dict.items():
-
-                # Dataframe name
-                name = category + '_' + str(value)
-
-                # --- Initialize output ---
-                # The output is initialized as a zero matrix with the same shape
-                # as the churn rates matrix
-                surv_by_cate[category][value] = numpy.zeros(p_of_t.shape[0])
-
-                # The initial value is one by definition (in this model death at
-                # t=0 is no considered).
-                surv_by_cate[category][value][0] = 1
-
-                # The value of month is simply given by the naive formula
-                #       1 - churn(t=1)
-                surv_by_cate[category][value][1] = 1 - p_of_t[name].values[1]
-
-                # The remaining values are calculated recursively using eq. 7 [1].
-                for i, val in enumerate(p_of_t[name].values[2:]):
-
-                    # Something here...
-                    surv_by_cate[category][value][i + 2] = surv_by_cate[category][value][i + 1] - val
-
-        # To data-frame and some re-formatting
-        out = pandas.DataFrame()
-        for category, value_dict in surv_by_cate.items():
-            for value, array in value_dict.items():
-                out[category + '_' + str(value)] = array
-        out = out.iloc[renewals:]
-        out.index = range(out.shape[0])
-
-        return out
+        return s
