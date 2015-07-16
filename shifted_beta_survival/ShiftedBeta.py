@@ -270,7 +270,7 @@ class ShiftedBeta(object):
             print('{:>15}: {}'.format('Reg. Penalty', reg_penalty))
             print()
 
-    def predict(self, X=None):
+    def predict(self, X):
         """
         computes alpha and beta for a each row of a given matrix x with the
         same shape as the data the model was trained on, obviously.
@@ -279,9 +279,9 @@ class ShiftedBeta(object):
         :return:
         """
         #  use this without bias
-        if X is None:
-            alpha = exp(self.alpha[0]) * numpy.ones(self.n_samples)
-            beta = exp(self.beta[0]) * numpy.ones(self.n_samples)
+        if self.alpha.shape[0] == 1:
+            alpha = exp(self.alpha[0]) * numpy.ones(X.shape[0])
+            beta = exp(self.beta[0]) * numpy.ones(X.shape[0])
         else:
             alpha, beta = self._compute_alpha_beta(X,
                                                    self.alpha[1:],
@@ -297,7 +297,7 @@ class ShiftedBeta(object):
         return self.alpha, self.beta
 
     def derl(self,
-             X=None,
+             X,
              age=1,
              alive=1,
              arpu=1.0,
