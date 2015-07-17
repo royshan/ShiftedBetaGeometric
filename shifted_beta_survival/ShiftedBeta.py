@@ -1,8 +1,8 @@
 from __future__ import print_function
 from scipy.optimize import minimize
-from math import log10, exp
+from math import log10
 from datetime import datetime
-import numpy
+import numpy as np
 from scipy.special import hyp2f1
 
 
@@ -56,8 +56,8 @@ class ShiftedBeta(object):
         # time is right they will be arrays with length a function of number of
         # predictors and whether or not a bias is being used. For now we
         # create a place holder array of a single zero.#
-        self.alpha = numpy.zeros(1)
-        self.beta = numpy.zeros(1)
+        self.alpha = np.zeros(1)
+        self.beta = np.zeros(1)
 
         # --- Regularization ---
         # In this model regularization helps by both limiting the model's
@@ -82,7 +82,7 @@ class ShiftedBeta(object):
         self.gammaa = gamma_alpha
         self.gammab = gamma_beta
 
-        # Boolean variable controling whether or not status updates should be
+        # Boolean variable controlling whether or not status updates should be
         # printed during training and other stages.
         self.verbose = verbose
 
@@ -124,7 +124,7 @@ class ShiftedBeta(object):
         # enter the loop. s_old is initialized to 1, as it should.
         s_old = 1.
 
-        # Accoring to equation 7 in [1] the next values of p and s are given by
+        # According to equation 7 in [1] the next values of p and s are given by
         p_new = alpha / (alpha + beta)
         s_new = 1. - p_new
 
@@ -185,7 +185,7 @@ class ShiftedBeta(object):
         wbT_dot_X = (w_b * X).sum(axis=1)
 
         # Return the element-wise exponential
-        return numpy.exp(waT_dot_X), numpy.exp(wbT_dot_X)
+        return np.exp(waT_dot_X), np.exp(wbT_dot_X)
 
     def _logp(self, X, age, alive, wa, wb):
         """
@@ -236,7 +236,7 @@ class ShiftedBeta(object):
         for y, z, a, b in zip(age, alive, alpha, beta):
 
             # add contribution of current customer to likelihood
-            log_like += numpy.log(self._recursive_retention_stats(a, b, y)[z])
+            log_like += np.log(self._recursive_retention_stats(a, b, y)[z])
 
         # Negative log_like since we will use scipy's minimize object.
         return -log_like
@@ -289,7 +289,7 @@ class ShiftedBeta(object):
 
         # --- Optimization Starting Points
         # Generate random starting points for optimization step.
-        initial_guesses = 0.1 * numpy.random.randn(restarts, 2 * n_params) - 0.01
+        initial_guesses = 0.1 * np.random.randn(restarts, 2 * n_params) - 0.01
 
         # Initialize optimal value to None
         # I choose not to set it to, say, zero, or any other number, since I am
@@ -297,7 +297,7 @@ class ShiftedBeta(object):
         # initialize with None and use the first optimal value to get the ball
         # rolling.
         optimal = None
-        opt_params = numpy.zeros((2 * n_params))
+        opt_params = np.zeros((2 * n_params))
 
         # clock
         start = datetime.now()
@@ -444,7 +444,7 @@ class ShiftedBeta(object):
         try:
             len(age) == X.shape[0]
         except TypeError:
-            age = age * numpy.ones(n_samples, dtype=int)
+            age = age * np.ones(n_samples, dtype=int)
 
         # age cannot be negative!
         if min(age) < 0:
@@ -454,9 +454,8 @@ class ShiftedBeta(object):
         # Initialize the output as a matrix of zeros. The number of rows is
         # given by the total number of samples, while the number of columns
         # is the number of months passed as a parameter.
-        p_churn_matrix = numpy.zeros((n_samples, max(age) + n_periods))
-        outputs = numpy.zeros((n_samples, max(age) + n_periods),
-                              dtype=bool)
+        p_churn_matrix = np.zeros((n_samples, max(age) + n_periods))
+        outputs = np.zeros((n_samples, max(age) + n_periods), dtype=bool)
 
         # sort this whole age thing out!
         outputs[:, 0][age < 1] = True
@@ -531,7 +530,7 @@ class ShiftedBeta(object):
             # is age a list like object?
             len(age) == X.shape[0]
         except TypeError:
-            age = age * numpy.ones(n_samples, dtype=int)
+            age = age * np.ones(n_samples, dtype=int)
             num_periods = int(max(age) + n_periods)
 
         # age cannot be negative!
@@ -544,12 +543,11 @@ class ShiftedBeta(object):
                                    age=0,
                                    n_periods=num_periods)
 
-        s = numpy.zeros(p_of_t.shape)
+        s = np.zeros(p_of_t.shape)
         s[:, 0] = 1.
 
         # output bool mask
-        outputs = numpy.zeros(p_of_t.shape,
-                              dtype=bool)
+        outputs = np.zeros(p_of_t.shape, dtype=bool)
 
         # set initial values
         outputs[:, 0][age < 1] = True
