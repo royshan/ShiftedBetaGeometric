@@ -151,9 +151,9 @@ class ShiftedBetaSurvival(object):
         z = df[self.alive].values.astype(int)
 
         # fit to data!
-        self.sb.fit(age=y,
+        self.sb.fit(X=x,
+                    age=y,
                     alive=z,
-                    X=x,
                     restarts=restarts)
 
         alpha, beta = self.sb.get_params()

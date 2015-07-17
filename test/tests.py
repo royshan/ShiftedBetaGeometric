@@ -257,8 +257,8 @@ if __name__ == '__main__':
     #sb_test(data[['category', 'random']], data['age'], data['alive'], names)
 
     #sb_test2()
-    #sb_test3()
-    surv_plot()
+    sb_test3()
+    #surv_plot()
 
     #sbs_test()
 

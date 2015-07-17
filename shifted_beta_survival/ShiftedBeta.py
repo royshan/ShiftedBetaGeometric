@@ -33,38 +33,71 @@ class ShiftedBeta(object):
 
     def __init__(self,
                  gamma_alpha=1.0,
-                 gamma_beta=None,
+                 gamma_beta=1.0,
                  add_bias=True,
                  verbose=False):
+        """
+        This object is initialized with training time hyper-parameters and a
+        verbose option.
 
-        self.alpha = None
-        self.beta = None
+        :param gamma_alpha: float
+            A non-negative float specifying the strength of the regularization
+            applied to w_alpha (alpha's weights).
 
-        # regularizer
+        :param gamma_beta: float
+            A non-negative float specifying the strength of the regularization
+            applied to w_beta (beta's weights).
+
+        :param add_bias: bool
+            Whether of not a bias term should be added to the data for training
+
+        :param verbose: bool
+            Whether of not status updates should be printed
+        """
+
+        # --- Parameters ---
+        # alpha and beta are the parameters learned by this model. When the
+        # time is right they will be arrays with length a function of number of
+        # predictors and whether or not a bias is being used. For now we
+        # create a place holder array of a single zero.#
+        self.alpha = numpy.zeros(1)
+        self.beta = numpy.zeros(1)
+
+        # --- Regularization ---
+        # In this model regularization helps by both limiting the model's
+        # complexity as well as greatly improving numerical stability during
+        # the optimization process.
+        # Moreover different regularization parameters for alpha and beta
+        # can be helpful, specially in extreme cases when the distribution
+        # is near the extremes (0 or 1).
+
+        # Clearly both gammas must be non-negative, so we make sure to check
+        # for it here.
         if gamma_alpha < 0:
-            raise ValueError("The regularization constant gamma must be a "
-                             "non-negative real number. A negative value of"
-                             " {} was passed.".format(gamma_alpha))
+            raise ValueError("The regularization constant gamma_alpha must "
+                             "be a non-negative real number. A negative "
+                             "value of {} was passed.".format(gamma_alpha))
 
-        # different regularization parameters for alpha and beta can be helpful
-        # so we include a ratio parameters that allows them to be set
-        # differently
+        if gamma_beta < 0:
+            raise ValueError("The regularization constant gamma_beta must "
+                             "be a non-negative real number. A negative "
+                             "value of {} was passed.".format(gamma_beta))
+
         self.gammaa = gamma_alpha
-        if gamma_beta is None:
-            self.gammab = self.gammaa
-        else:
-            self.gammab = gamma_beta
+        self.gammab = gamma_beta
 
-        # bias
+        # --- Bias
+        # A bias term may be added to the model allowing it to learn a baseline
+        # value for the parameters that is then perturbed by each different
+        # predictor.
         self.bias = add_bias
 
-        # ops obj
-        self.opt = None
-
-        # verbose param
+        # Boolean variable controling whether or not status updates should be
+        # printed during training and other stages.
         self.verbose = verbose
 
-        # size of dataset
+        # A variable to store the size of the dataset, useful in certain
+        # situations where no predictors are being used.
         self.n_samples = 0
 
     @staticmethod
@@ -72,67 +105,97 @@ class ShiftedBeta(object):
         """
         A function to calculate the expected probabilities recursively.
         Using equation 7 from [1] and the alpha and beta coefficients
-        obtained by training this model, it computes P(T = t) recursively,
-        returning a list with all values.
-
-        Survival function recursive calculation. Using equation 7 from [1]
-        and the alpha and beta coefficients obtained by training this
-        model, it computes S(T = t) recursively, returning a list of all
-        computed values.. To do so it must first invoke the function
-        P_T_is_t calculate the monthly churn rates for the given time
-        window, and then use it to compute the survival curve recursively.
+        obtained by training this model, it computes P(T = t)  as well
+        as S(T = t) recursively, returning only the relevant values
+        for computing the individual contribution to the likelihood.
 
         :param alpha: float
-            The distribution for the alpha parameter.
+            A value for the alpha parameter.
 
         :param beta: float
-            The distribution for the beta parameter.
+            A value for the beta parameter.
 
         :param num_periods: Int
             The number of periods for which the probability of churning
             should be computed.
 
-        :return: (list, list)
-            A list with probability of churning for all periods from month
-            zero to num_periods.
+        :return: (float, float)
+            A tuple with both the probability of dieing as well as
+            surviving the current period.
         """
-        alpha = max(min(alpha, 1e4), 1e-4)
-        beta = max(min(beta, 1e4), 1e-4)
+        # Extreme values of alpha and beta can cause severe numerical stability
+        # problems! We avoid some of if by clipping the values of both alpha and
+        # beta parameters such that they lie between 1e-5 and 1e5.
+        alpha = max(min(alpha, 1e5), 1e-5)
+        beta = max(min(beta, 1e5), 1e-5)
 
-        # Initialize list with t = 0 and t = 1 values
+        # --- Initialize Recursion Values
+        # We hold off initializing p_old since it is not necessary until we
+        # enter the loop. s_old is initialized to 1, as it should.
         s_old = 1.
 
+        # Accoring to equation 7 in [1] the next values of p and s are given by
         p_new = alpha / (alpha + beta)
         s_new = 1. - p_new
 
+        # For subsequent periods we calculate the new values of both p and s
+        # recursively. Updating old and new values accordingly.
+        #
+        # ** Note that the loop starts with a value of two and extends to
+        # num_periods + 1, the reason behind this is that num_periods will
+        # usually represent the age of a subject. In the context of a
+        # subscription based business, the age of a subject often translates to
+        # how many payments have been made so far, and thus must be a positive
+        # integer.
+        # A value of one means the subject is in its first period and
+        # the entire population is still alive (by definition), hence the
+        # values initialized prior to the loop. **
         for t in range(2, num_periods + 1):
 
+            # Update old values with current new values
             p_old = 1. * p_new
             s_old = 1. * s_new
 
-            # Compute latest p value and append
+            # Update p_new with the latest p value
             p_new = (beta + t - 2.) / (alpha + beta + t - 1.) * p_old
 
-            # use the most recent appended p value to keep building s
+            # Use the newly calculated p_new to update s_new
             s_new = s_old - p_new
 
-        # finish this...
+        # Note that p_new is the likelihood of not making to the next period
+        # while s_old is the likelihood of surviving the current period. Which
+        # is used in the likelihood depends on whether or not the subject is
+        # alive or dead.
         return p_new, s_old
 
     @staticmethod
-    def _compute_alpha_beta(X, alpha, beta):
+    def _compute_alpha_beta(X, w_a, w_b):
+        """
+        This method computes the float values of alpha and beta given a matrix
+        of predictors X and an array of weighs wa and wb. It does so by taking
+        the dot product of w_a (w_b) with the matrix X and exponentiating it
+        the resulting array.
+
+        :param X: ndarray of shape (n_samples, n_features)
+            The feature matrix.
+
+        :param w_a: ndarray of shape (n_features, )
+            Array of weights for the alpha parameter
+
+        :param w_b: ndarray of shape (n_features, )
+            Array of weights for the alpha parameter
+
+        :return: (ndarray, ndarray) both with shapes (n_samples, )
+            The alpha and beta values calculated for each row of the feature
+            matrix X.
         """
 
-        :param X:
-        :param alpha:
-        :param beta:
-        :return:
-        """
+        # Take that dot product!
+        waT_dot_X = (w_a * X).sum(axis=1)
+        wbT_dot_X = (w_b * X).sum(axis=1)
 
-        alpha_weights = (alpha * X).sum(axis=1)
-        beta_weights = (beta * X).sum(axis=1)
-
-        return numpy.exp(alpha_weights), numpy.exp(beta_weights)
+        # Return the element-wise exponential
+        return numpy.exp(waT_dot_X), numpy.exp(wbT_dot_X)
 
     def _logp(self, X, age, alive, wa, wb):
         """
@@ -158,14 +221,22 @@ class ShiftedBeta(object):
         log_like = 0.0
 
         # L2 regularizer
-        # something about l2 regularization
-        # Explain why the intercept (zero-th index portion of alpha and beta)
-        # are not subject to regularization. Also, think whether this is the
-        # best way of handling this, or whether adding a dedicated intercept
-        # is a better choice.
+        # In this model regularization helps by both limiting the model's
+        # complexity as well as greatly improving numerical stability during
+        # the optimization process.
+        # However, it is undesirable to regularize the bias weights, since
+        # this can stop the model from learning anything. *** Note that
+        # this is different than the case of, say, a linear model, where the
+        # trivial model (with zero weights) approximates the mean of the
+        # target values. Here, the absence of weights (including bias) does
+        # NOT lead to a trivial model, but one with a unreasonable
+        # preference for alpha = exp(0) and beta = exp(0). ***
+        # Moreover different regularization parameters for alpha and beta
+        # can be helpful, specially in extreme cases when the distribution
+        # is near the extremes (0 or 1)
         l2_reg = self.gammaa * sum(wa[1:]**2) + self.gammab * sum(wb[1:]**2)
 
-        # update ll with regularization val.
+        # update log-likelihood with regularization val.
         log_like -= l2_reg
 
         # get real alpha and beta
@@ -180,7 +251,42 @@ class ShiftedBeta(object):
         # Negative log_like since we will use scipy's minimize object.
         return -log_like
 
-    def fit(self, age, alive, X=None, restarts=50):
+    def fit(self, X, age, alive, restarts=1):
+        """
+        Method responsible for the learning step it takes all the relevant data
+        as argument as well as the number of restarts with random seeds to
+        perform. While restarting with other seeds sounds like a good idea the
+        model has proven to be fairly stable and this may be removed in the
+        future.
+
+        *** This model can work without any features (only bias), think about
+        the best way to integrate this into the code! ***
+
+        :param X: ndarray of shape (n_samples, n_features)
+            The feature matrix
+
+        :param age: ndarray of shape (n_samples, )
+            An array with the age of each individual.
+
+        :param alive: ndarray of shape (n_samples, )
+            An array with
+        :param restarts:
+        :return:
+        """
+
+        # Make sure ages are all non negative...
+        min_age = min(age)
+        if min(age) < min_age:
+            raise ValueError("All values of age must be equal or greater to "
+                             "one. The minimum value of "
+                             "{} was found.".format(min_age))
+
+        # Make sure alive is either zero or one!
+        alive_vals = set(alive)
+        if alive_vals != {0, 1}:
+            raise ValueError('Values for alive must be either zero or one. A '
+                             'value of '
+                             '{} was found.'.format(list(alive_vals - {0, 1})))
 
         # Free space when printing
         print_space = max(int(log10(restarts)) + 1, 5)
@@ -206,6 +312,7 @@ class ShiftedBeta(object):
         # initialize with None and use the first optimal value start the ball
         # rolling.
         optimal = None
+        opt_params = numpy.zeros((2 * n_params))
 
         # clock
         start = datetime.now()
@@ -243,12 +350,12 @@ class ShiftedBeta(object):
             # If first run...
             if optimal is None:
                 optimal = new_opt.fun
-                self.opt = new_opt.x
+                opt_params = new_opt.x
 
             # Have we found a better value yet?
             if new_opt.fun > optimal:
                 optimal = new_opt.fun
-                self.opt = new_opt.x
+                opt_params = new_opt.x
 
             if self.verbose:
                 print("{0: {3}} | {1:^10.10} | {2:13.8} |".format(step + 1,
@@ -256,8 +363,8 @@ class ShiftedBeta(object):
                                                                   optimal,
                                                                   print_space))
 
-        self.alpha = self.opt[:n_params]
-        self.beta = self.opt[n_params:]
+        self.alpha = opt_params[:n_params]
+        self.beta = opt_params[n_params:]
 
         reg_penalty = self.gammaa * sum(self.alpha**2) + self.gammab * sum(self.beta**2)
 
