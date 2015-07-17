@@ -34,7 +34,6 @@ class ShiftedBeta(object):
     def __init__(self,
                  gamma_alpha=1.0,
                  gamma_beta=1.0,
-                 add_bias=True,
                  verbose=False):
         """
         This object is initialized with training time hyper-parameters and a
@@ -47,9 +46,6 @@ class ShiftedBeta(object):
         :param gamma_beta: float
             A non-negative float specifying the strength of the regularization
             applied to w_beta (beta's weights).
-
-        :param add_bias: bool
-            Whether of not a bias term should be added to the data for training
 
         :param verbose: bool
             Whether of not status updates should be printed
@@ -85,12 +81,6 @@ class ShiftedBeta(object):
 
         self.gammaa = gamma_alpha
         self.gammab = gamma_beta
-
-        # --- Bias
-        # A bias term may be added to the model allowing it to learn a baseline
-        # value for the parameters that is then perturbed by each different
-        # predictor.
-        self.bias = add_bias
 
         # Boolean variable controling whether or not status updates should be
         # printed during training and other stages.
@@ -288,28 +278,23 @@ class ShiftedBeta(object):
                              'value of '
                              '{} was found.'.format(list(alive_vals - {0, 1})))
 
-        # Free space when printing
+        # Free space when printing based on the total amount of restarts.
         print_space = max(int(log10(restarts)) + 1, 5)
 
         # store the number of samples we are dealing with
         self.n_samples = age.shape[0]
 
-        # Add bias
-        if X is None:
-            X = numpy.ones((self.n_samples, 1))
-        elif self.bias:
-            X = numpy.concatenate((numpy.ones((self.n_samples, 1)), X), axis=1)
-
-        # Now we have X we can calculate the number of params we need
+        # Now that we have X we can calculate the number of params we need
         n_params = X.shape[1]
 
-        # guesses of initial parameters
+        # --- Optimization Starting Points
+        # Generate random starting points for optimization step.
         initial_guesses = 0.1 * numpy.random.randn(restarts, 2 * n_params) - 0.01
 
         # Initialize optimal value to None
         # I choose not to set it to, say, zero, or any other number, since I am
         # not sure that the log-likelihood is bounded in anyway. So is better to
-        # initialize with None and use the first optimal value start the ball
+        # initialize with None and use the first optimal value to get the ball
         # rolling.
         optimal = None
         opt_params = numpy.zeros((2 * n_params))
@@ -317,12 +302,12 @@ class ShiftedBeta(object):
         # clock
         start = datetime.now()
 
+        # Print a nice looking  header for the optimization process
         if self.verbose:
             print('Starting Optimization with parameters:')
             print('{:>15}: {}'.format('Samples', self.n_samples))
             print('{:>15}: {}'.format('gamma (alpha)', self.gammaa))
             print('{:>15}: {}'.format('gamma (beta)', self.gammaa))
-            print('{:>15}: {}'.format('bias', self.bias))
             print('{:>15}: {}'.format('Seeds', restarts))
 
             print()
@@ -335,9 +320,12 @@ class ShiftedBeta(object):
         # Run likelihood optimization for several steps...
         # noinspection PyTypeChecker
         for step, guess in enumerate(initial_guesses):
+            # --- Variables
+            #   step: Integer - current step number
+            #  guess: Array - array with starting points for minimization
 
             # --- Optimization
-            # something...
+            # Unbounded optimization (minimization) of negative log-likelihood
             new_opt = minimize(lambda p: self._logp(X=X,
                                                     age=age,
                                                     alive=alive,
@@ -347,27 +335,43 @@ class ShiftedBeta(object):
                                bounds=[(None, None)] * n_params * 2
                                )
 
-            # If first run...
+            # For the first run only optimal is None, that being the case, we
+            # set the current values to both optimal (function value) as well
+            # as opt_params - parameters that minimize the function.
             if optimal is None:
                 optimal = new_opt.fun
                 opt_params = new_opt.x
 
-            # Have we found a better value yet?
-            if new_opt.fun > optimal:
+            # Have we found a better value yet? If we have, update optimal
+            # with new function minimum and opt_params with corresponding
+            # minimizing parameters.
+            if new_opt.fun < optimal:
                 optimal = new_opt.fun
                 opt_params = new_opt.x
 
+            # Print current status if verbose is True.
             if self.verbose:
-                print("{0: {3}} | {1:^10.10} | {2:13.8} |".format(step + 1,
-                                                                  datetime.now() - start,
-                                                                  optimal,
-                                                                  print_space))
+                print_string = "{0: {3}} | {1:^10.10} | {2:13.8} |"
+                print(print_string.format(step + 1,
+                                          datetime.now() - start,
+                                          optimal,
+                                          print_space))
 
+        # --- Parameter Values
+        # Optimization is complete, time to save best parameters.
+        # Note that we breakdown the parameters passed to and returned from
+        # the scipy.optimize.minimize object in two. The first half correspond
+        # to the alpha parameter, while the second half is beta.
         self.alpha = opt_params[:n_params]
         self.beta = opt_params[n_params:]
 
-        reg_penalty = self.gammaa * sum(self.alpha**2) + self.gammab * sum(self.beta**2)
+        # --- Regularization Penalty
+        # Compute the regularization penalty applied to the parameter vectors.
+        # Remember that there is no penalty for bias!
+        reg_penalty = self.gammaa * sum(self.alpha[1:]**2) + \
+            self.gammab * sum(self.beta[1:]**2)
 
+        # Print some final remarks before we say goodbye.
         if self.verbose:
             print()
             print('Optimization completed:')
@@ -376,32 +380,6 @@ class ShiftedBeta(object):
             print('{:>15}: {}'.format('LogLikelihood', optimal))
             print('{:>15}: {}'.format('Reg. Penalty', reg_penalty))
             print()
-
-    def predict(self, X):
-        """
-        computes alpha and beta for a each row of a given matrix x with the
-        same shape as the data the model was trained on, obviously.
-
-        :param X:
-        :return:
-        """
-        #  use this without bias
-        if self.alpha.shape[0] == 1:
-            alpha = exp(self.alpha[0]) * numpy.ones(X.shape[0])
-            beta = exp(self.beta[0]) * numpy.ones(X.shape[0])
-        else:
-            alpha, beta = self._compute_alpha_beta(X,
-                                                   self.alpha[1:],
-                                                   self.beta[1:])
-
-            # add bias contribution
-            alpha *= exp(self.alpha[0])
-            beta *= exp(self.beta[0])
-
-        return numpy.vstack([alpha, beta]).T
-
-    def get_params(self):
-        return self.alpha, self.beta
 
     def derl(self,
              X,
@@ -413,19 +391,16 @@ class ShiftedBeta(object):
         Discounted Expected Residual Lifetime, as derived in [2].
         See equation (6).
 
-        :param arpu: Float
-            Average Revenue Per User
+        :param X:
+        :param age:
+        :param alive:
+        :param arpu:
+        :param discount_rate:
 
-        :param discount_rate: Float
-            discount rate
-
-        :return: Float
-            The DERL for the above values.
+        :return: DERL
         """
-        params = self.predict(X)
 
-        alpha = params[:, 0]
-        beta = params[:, 1]
+        alpha, beta = self._compute_alpha_beta(X, self.alpha, self.beta)
 
         # To make it so that the formula resembles that of the paper we define
         # the parameter n as below.
@@ -447,14 +422,12 @@ class ShiftedBeta(object):
         training this model, it computes P(T = t) recursively, returning either
         the expected value or an array of values.
 
-        :type X: ndarray
-        :param n_periods: Int
-            The number of months to compute the curve for
-
-        :return: Float or ndarray
-            Returns as float if expected is true and a ndarray is expected is
-            false.
+        :param X:
+        :param age:
+        :param n_periods:
+        :return:
         """
+
         # Spot checks making sure the values passed make sense!
         if n_periods < 0 or not isinstance(n_periods, int):
             raise ValueError("The number of periods must be a non-zero "
@@ -463,10 +436,7 @@ class ShiftedBeta(object):
         # Load alpha and beta sampled from the posterior. These fully
         # determine the beta distribution governing the customer level
         # churn rates
-        params = self.predict(X)
-
-        alpha = params[:, 0]
-        beta = params[:, 1]
+        alpha, beta = self._compute_alpha_beta(X, self.alpha, self.beta)
 
         # set the number of samples
         n_samples = X.shape[0]
@@ -527,13 +497,13 @@ class ShiftedBeta(object):
         the monthly churn rates for the given time window, and then use it to
         compute the survival curve recursively.
 
-        :param n_periods: Int
-            The number of months to compute the curve for
+        :param X:
+        :param age:
+        :param n_periods:
 
-        :return: Float or ndarray
-            Returns as float if expected is true and a ndarray is expected is
-            false.
+        :return:
         """
+
         # Spot checks making sure the values passed make sense!
         if n_periods < 0 or not isinstance(n_periods, int):
             raise ValueError("The number of periods must be a non-zero "
@@ -568,6 +538,8 @@ class ShiftedBeta(object):
         if min(age) < 0:
             raise ValueError("All ages must be non-negative.")
 
+        # Age of zero means we want survival func of current month as the
+        # starting point! explain more.
         p_of_t = self.churn_p_of_t(X=X,
                                    age=0,
                                    n_periods=num_periods)

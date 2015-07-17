@@ -100,6 +100,7 @@ def sb_test(x, y, z, names):
 
     #wa = numpy.asarray([-0.40346710544549125, 0.05249018262139654])
     #wb = numpy.asarray([1.3365787688739577, -1.1693708498900512])
+    x = numpy.concatenate((numpy.ones((x.shape[0], 1)), x), axis=1)
 
     sb.fit(y, z, x, restarts=3)
 
@@ -131,7 +132,8 @@ def sb_test2():
     #names = list(data.keys())[:-2]
 
     x = data[names].values
-    #x = data.values[:, :-3]
+    x = numpy.concatenate((numpy.ones((x.shape[0], 1)), x), axis=1)
+
     y = data.values[:, -2].astype(int)
     z = data.values[:, -1].astype(int)
 
@@ -152,8 +154,8 @@ def sb_test2():
 
 def sb_test3():
 
-    data = pandas.read_csv('../data/data_2yr.csv')
-    total_size = 50#data.shape[0]
+    data = pandas.read_csv('../data/data_3yr.csv')
+    total_size = 5000#data.shape[0]
     index = numpy.arange(data.shape[0])
     numpy.random.shuffle(index)
     index = index[:total_size]
@@ -161,45 +163,38 @@ def sb_test3():
     data = data.iloc[index]
     data.index = numpy.arange(total_size)
 
-    #names = ['freshapp', 'mobile', 'fic', 'annual']
-    names = list(data.keys())[1:-2]
+    names = ['freshapp', 'annual']
+    #names = list(data.keys())[1:-2]
 
     x = data[names].values
+    x = numpy.concatenate((numpy.ones((x.shape[0], 1)), x), axis=1)
+
     y = data.values[:, -2].astype(int)
     z = data.values[:, -1].astype(int)
 
     names = ['bias'] + names
 
     sb = ShiftedBeta(verbose=True, gamma_alpha=1e1, gamma_beta=1e1)
-    sb.fit(y, z, x, restarts=1)
+    sb.fit(x, y, z, restarts=3)
 
     print_stats(sb.alpha, sb.beta, [0], names)
     for i in range(1, len(names)):
         print_stats(sb.alpha, sb.beta, [0, i], names)
 
     preds_coeff = sb.predict(x)
-    preds = data[['system_key']].copy()
+    preds = data[['systemid']].copy()
     preds['alpha'] = preds_coeff[:, 0]
     preds['beta'] = preds_coeff[:, 1]
     preds['churn'] = preds_coeff[:, 0] / (preds_coeff[:, 0] + preds_coeff[:, 1])
-
-    #print(sb.derl(x, y, z).shape)
-
-    #print(sb.churn_p_of_t(x, y, n_periods=6))
-
-    ages = numpy.ones(50, dtype=int)
-    ages[25:] += 3
-    print(sb.churn_p_of_t(x, ages, n_periods=6))
-    #print(sb.survival_function(X=x, age=y, n_periods=6))
-    #print(sb.survival_function(X=x, age=2, n_periods=12))
 
 
 def surv_plot():
 
     x, y, z, names = article_data(copies=2, random=False)
+    x = numpy.concatenate((numpy.ones((x.shape[0], 1)), x), axis=1)
 
     sb = ShiftedBeta(verbose=True, gamma_alpha=1e-1, gamma_beta=1e-1)
-    sb.fit(y, z, x, restarts=1)
+    sb.fit(x, y, z, restarts=1)
 
     print_stats(sb.alpha, sb.beta, [0], names)
     for i in range(1, len(names)):
@@ -257,8 +252,8 @@ if __name__ == '__main__':
     #sb_test(data[['category', 'random']], data['age'], data['alive'], names)
 
     #sb_test2()
-    sb_test3()
-    #surv_plot()
+    #sb_test3()
+    surv_plot()
 
     #sbs_test()
 
