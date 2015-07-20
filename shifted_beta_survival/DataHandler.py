@@ -1,54 +1,5 @@
-import numpy
-
-
-class CategoryEncoder(object):
-    """
-    object to take a pandas dataset and return a numpy array with categorical
-    variables one-hot-encoded. Additionally the age and alive fields should be
-    automatically parsed too.
-
-    should it try to infer stuff automatically?
-    """
-
-    def __init__(self, age, alive, features=None, categorical=None):
-
-        self.age = age
-        self.alive = alive
-
-        # If the category name was passed as a single string, we turn it into
-        # a list of one element (not list of characters, as you would get with
-        # list('abc').
-        if isinstance(features, str):
-            features = [features]
-        # Try to explicitly transform category to a list (perhaps it was passed
-        # as a tuple or something. If it was None to begin with, we catch a
-        # TypeError and move on.
-        try:
-            self.features = sorted(features)
-        except TypeError:
-            self.features = None
-
-        # If the category name was passed as a single string, we turn it into
-        # a list of one element (not list of characters, as you would get with
-        # list('abc').
-        if isinstance(categorical, str):
-            categorical = [categorical]
-        # Try to explicitly transform category to a list (perhaps it was passed
-        # as a tuple or something. If it was None to begin with, we catch a
-        # TypeError and move on.
-        try:
-            self.categorical = sorted(categorical)
-        except TypeError:
-            self.categorical = None
-
-    def transform(self, df):
-        pass
-
-    def label_encoder(self):
-        pass
-
-    def one_hot_encoder(self):
-        pass
+import numpy as np
+import pandas as pd
 
 
 class DataHandler(object):
@@ -78,28 +29,20 @@ class DataHandler(object):
     adjusting all lists of cohort population to have the same length.
     """
 
-    def __init__(self, age, alive, features=None, types=None):
+    def __init__(self, age, alive, features=None, bias=True, standard=True):
         """
         The object is initialized with the dataset to be transformed, the name
         of the fields identified as cohort, individual age and optional
         category(ies) to be used as predictors.
 
-        :param cohort: str
-            The column name to identify to which cohort each individual belongs
-            to.
-
         :param age: str
             The column name to identify the age of each individual. Age has to
             be an integer value, and will determine the time intervals the
             model with work with.
-
-        :param category: str or list of str
-            A list or string with the column name(s) of fields to be used as
-            features. These fields are treated as categorical variables and
-            are one hot encoded and fed to a linear model.
         """
 
         self.age = age
+        self.alive = alive
 
         # If the category name was passed as a single string, we turn it into
         # a list of one element (not list of characters, as you would get with
@@ -114,10 +57,120 @@ class DataHandler(object):
         except TypeError:
             self.features = None
 
-        if types is None:
-            self._get_types()
-        else:
-            self.types = types
+        # What features are categorical?
+        self.categorical = []
+        self.numerical = []
 
-    def _get_types(self):
-        self.types = 0
+        # OHE feature map to be constructed
+        self.feature_map = {}
+
+        # should bias be added
+        self.add_bias = bias
+
+        # stadarize features?
+        self.standard = standard
+
+    @staticmethod
+    def _get_categoricals(df, features):
+
+        # No features? No problem!
+        if features is None:
+            return [], []
+
+        # Yes Features? Do stuff!!
+        cat_list = df.columns[df.dtypes == 'category']
+        cat_list = [cat for cat in cat_list if cat in features]
+
+        # Update them categorical features
+        cat = sorted(cat_list)
+
+        # Build feature maps!
+        feat_map = {}
+
+        for feature in cat:
+            feat_map[feature] = dict(zip(sorted(df[feature].cat.categories),
+                                         range(len(df[feature].cat.categories))))
+
+        # Update numerical features
+        num = sorted([feat for feat in features if feat not in cat])
+
+        # Returns both lists
+        return cat, feat_map, num
+
+    def _one_hot_encode(self, df, categoricals):
+
+        ohed_map = {}
+
+        # Loop over each categorical feature and create appropriate feature
+        # maps and what not
+        for feature in categoricals:
+            ohed_map[feature] = np.zeros((df.shape[0],
+                                          len(self.feature_map[feature])),
+                                         dtype=int)
+
+        warning_new = {}
+
+        def update_ohe_matrix(row, categorical_columns):
+
+            for feature in categorical_columns:
+                try:
+                    ohed_map[feature][row.name,
+                                      self.feature_map[feature][row[feature]]] += 1
+                except KeyError:
+                    try:
+                        warning_new[feature].add(row[feature])
+                    except KeyError:
+                        warning_new[feature] = {row[feature]}
+
+        df.apply(lambda row: update_ohe_matrix(row, categoricals),
+                 axis=1)
+
+        if len(warning_new) > 0:
+            print('WARNING: NEW STUFF: {}'.format(warning_new))
+
+        return np.concatenate([xohe for key, xohe in ohed_map.items()], axis=1)
+
+    def fit(self, df):
+
+        # Get types of features (in place updates!)
+        cat, feat_map, num = self._get_categoricals(df=df, features=self.features)
+
+        # store features
+        self.categorical.extend(cat)
+        self.feature_map = feat_map
+        self.numerical.extend(num)
+
+    def transform(self, df):
+
+        if self.add_bias:
+            xout = np.ones((df.shape[0], 1), dtype=int)
+        else:
+            xout = None
+
+        # do we have numerical stuff?
+        if len(self.numerical) > 0:
+            # bias?
+            if self.add_bias:
+                xout = np.concatenate((xout, df[self.numerical].values),
+                                      axis=1)
+            else:
+                xout = df[self.numerical].values
+
+        if len(self.categorical) > 0:
+
+            # get one hot encoded guys
+            xohe = self._one_hot_encode(df, self.categorical)
+
+            # bias?
+            if xout is not None:
+                xout = np.concatenate((xout, xohe),
+                                      axis=1)
+            else:
+                xout = xohe
+
+        if xout is None:
+            raise ValueError('No data!')
+
+        return xout, df[self.age].values, df[self.alive].values
+
+

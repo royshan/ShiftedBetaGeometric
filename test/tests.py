@@ -10,7 +10,6 @@ sns.set_style("darkgrid")
 import sys
 sys.path.append('../shifted_beta_survival/')
 from ShiftedBetaSurvival import ShiftedBetaSurvival
-from DataHandler import DataHandler
 from ShiftedBeta import ShiftedBeta
 
 
