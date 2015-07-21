@@ -12,120 +12,43 @@ class ShiftedBetaSurvival(object):
     what is this?
     """
 
-    def __init__(self, age,
+    def __init__(self,
+                 age,
                  alive,
                  features=None,
                  gamma=1.0,
                  gamma_beta=1.0,
                  bias=True,
+                 normalize=True,
                  verbose=False):
         """
-        stuff ...
 
-        :param cohort:
         :param age:
-        :param category:
+        :param alive:
+        :param features:
         :param gamma:
+        :param gamma_beta:
+        :param bias:
+        :param normalize:
         :param verbose:
         :return:
         """
-        # ORIGINAL DATA
-        # The original dataset is stored in the following two variables.
-        #   df: Original data in its original format
-        # data: Original data transformed into map of category-value -
-        #       (cohort population, population lost) pairs.
-        self.df = None
-        self.data = None
-
-        # COLUMN'S NAMES
-        # The names of the columns used as cohort, age and category throughout
-        # the code.
-        self.age = age
-        self.alive = alive
-
-        # whether or not we should add a bias
-        self.bias = bias
-
-        # If the category name was passed as a single string, we turn it into
-        # a list of one element (not list of characters, as you would get with
-        # list('abc').
-        if isinstance(features, str):
-            features = [features]
-        # Try to explicitly transform category to a list (perhaps it was passed
-        # as a tuple or something. If it was None to begin with, we catch a
-        # TypeError and move on.
-        try:
-            self.features = sorted(features)
-        except TypeError:
-            self.features = None
-            # Set bias to true if no features are being used
-            self.bias = True
-
-        if bias:
-            if self.features is None:
-                self.names = ['bias']
-            else:
-                self.names = ['bias'] + self.features
-        else:
-            self.names = self.features
-
-        # SHIFTED-BETA-GEOMETRIC MODEL
-        # Since the training data is only available at training time (upon
-        # calling .fit(), we must postpone the initialization of the
-        # ShiftedBEta object, so we simple initialize it as None.
-        self.sb = None
-        self.sb_params = None
-
-        # Instance parameters used to hold the post-train values of alpha and
-        # beta.
-        self.alpha = None
-        self.beta = None
-
-        # L2 regularizer
-        # The L2 regularization is governed by the size of the parameter gamma.
-        # In the current implementation a value of zero for the regularization
-        # constant is allowed, since the biar of the linear model is not
-        # regularized, and a pathological solution to the optimization problem
-        # is unlikely to happen.
-        # However, negatives values for gamma not only don't make sense, but
-        # they break everything. So we make sure the value of gamma passed is
-        # a resonable one.#
-        if gamma < 0:
-            raise ValueError("The regularization constant gamma must be a "
-                             "non-negative real number. A negative value of"
-                             " {} was passed.".format(gamma))
-        self.gamma = gamma
-
-        if gamma_beta is None:
-            # Use gamma value by default
-            self.gamma_beta = gamma
-        else:
-            # make sure is not zero
-            if gamma_beta < 0:
-                raise ValueError("The regularization constant gamma must be a "
-                                 "non-negative real number. A negative value of"
-                                 " {} was passed.".format(gamma))
-
-            self.gamma_beta = gamma_beta
-
-        # trained?
-        self.trained = False
-
-        # verbose controller
-        self.verbose = verbose
 
         # Create objects!
         # DATA-HANDLER OBJECT
         # The DataHandler object may be created without the training data, so
         # we do it here.
-        #self.dh = DataHandler()
+        self.dh = DataHandler(age=age,
+                              alive=alive,
+                              features=features,
+                              bias=bias,
+                              normalize=normalize)
 
         # Shifted beta model object
         # create shifted beta object
-        self.sb = ShiftedBeta(gamma_alpha=self.gamma,
-                              gamma_beta=self.gamma_beta,
-                              add_bias=self.bias,
-                              verbose=self.verbose)
+        self.sb = ShiftedBeta(gamma_alpha=gamma,
+                              gamma_beta=gamma_beta,
+                              verbose=verbose)
 
     def fit(self, df, restarts=1):
         """
@@ -141,14 +64,10 @@ class ShiftedBetaSurvival(object):
             Number of times to restart the optimization procedure with a
             different seed, to avoid getting stuck on local maxima.
         """
-
-        if self.features is None:
-            x = None
-        else:
-            x = df[self.features].values
-        # targets
-        y = df[self.age].values.astype(int)
-        z = df[self.alive].values.astype(int)
+        # Deal with DF index problem! If its not a perfect range(df.shape[0]) the
+        # code will break! Is there an easy way of checking with minimal
+        # computational load?
+        x, y, z = self.dh.fit_transform(df)
 
         # fit to data!
         self.sb.fit(X=x,
@@ -156,30 +75,12 @@ class ShiftedBetaSurvival(object):
                     alive=z,
                     restarts=restarts)
 
-        alpha, beta = self.sb.get_params()
-        self.sb_params = dict(alpha=dict(zip(self.names, alpha)),
-                              beta=dict(zip(self.names, beta)))
-
-        # Trained successful means training is done!
-        self.trained = True
-
     def summary(self):
         """
 
         :return:
         """
-
-        # Model ran?
-        if not self.trained:
-            raise RuntimeError('Train the model first!')
-
-        out = pandas.DataFrame(self.sb_params)
-
-        # Take exponential
-        out['exp(alpha)'] = numpy.exp(out['alpha'])
-        out['exp(beta)'] = numpy.exp(out['beta'])
-
-        return out
+        return 0
 
     def get_coeffs(self):
 

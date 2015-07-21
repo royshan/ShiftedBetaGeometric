@@ -22,7 +22,7 @@ def test_get_cats():
 
     dh = DataHandler(age='age',
                      alive='alive',
-                     features=['origin', 'profession', 'frequency', 'amount', 'lamount'],
+                     features=['origin', 'profession', 'frequency', 'amount', 'lamount', 'is_contractor'],
                      #features=['amount', 'lamount'],
                      bias=True,
                      normalize=True
@@ -34,6 +34,8 @@ def test_get_cats():
     print(x)
     print(dh.stats)
     print(dh.feature_map)
+
+    print(dh.get_names())
 
 if __name__ == '__main__':
 

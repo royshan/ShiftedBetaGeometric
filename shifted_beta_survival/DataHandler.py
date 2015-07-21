@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 
 
 class DataHandler(object):
@@ -78,6 +77,9 @@ class DataHandler(object):
         self.normalize = normalize
         self.stats = {'mean': {}, 'std': {}}
 
+        # fit before transform!
+        self.fitted_model = False
+
     @staticmethod
     def _get_categoricals(df, features):
         """
@@ -118,6 +120,8 @@ class DataHandler(object):
         :param categoricals:
         :return:
         """
+        # Make sure these are sorted so we don't get things mixed up later!
+        categoricals = sorted(categoricals)
 
         # dict to hold matrices of OHE features
         ohed_map = {}
@@ -191,9 +195,12 @@ class DataHandler(object):
         if self.normalize and len(self.numerical) > 0:
             # pandas is awesome!
             stats = df[self.numerical].describe().T.to_dict()
-            # update means and stds at once =)
+            # update mean and std at once =)
             self.stats['mean'].update(stats['mean'])
             self.stats['std'].update(stats['std'])
+
+        # update fitted status
+        self.fitted_model = True
 
     def transform(self, df):
         """
@@ -201,6 +208,8 @@ class DataHandler(object):
         :param df:
         :return:
         """
+        if not self.fitted_model:
+            raise RuntimeError("Fit to data before transforming it.")
 
         if self.add_bias:
             xout = np.ones((df.shape[0], 1), dtype=int)
@@ -218,7 +227,7 @@ class DataHandler(object):
                     #    col:
                     # n_feat:
                     num_vals[:, col] -= self.stats['mean'][num_feat]
-                    # Some arbitrary clip on minimum STD lest thigns break
+                    # Some arbitrary clip on minimum STD lest things break
                     num_vals[:, col] /= max(self.stats['std'][num_feat], 1e-4)
 
             # bias?
@@ -230,8 +239,9 @@ class DataHandler(object):
 
         if len(self.categorical) > 0:
 
-            # get one hot encoded guys
-            xohe = self._one_hot_encode(df, self.categorical)
+            # get one hot encoded guys, sort categoricals just to be extra
+            # sure (they are already sorted down the line).
+            xohe = self._one_hot_encode(df, sorted(self.categorical))
 
             # bias?
             if xout is not None:
@@ -254,3 +264,27 @@ class DataHandler(object):
 
         self.fit(df)
         return self.transform(df)
+
+    def get_names(self):
+        """
+        A handy function to return the names of all variables in the
+        transformed version of the dataset in the correct order. Particularly
+        useful for the shiftedbetasurvival wrapper.
+
+        :return: list
+            list of names in correct order
+        """
+        names = []
+
+        if self.add_bias:
+            names.append('bias')
+
+        if len(self.numerical) > 0:
+            names.extend(sorted(self.numerical))
+
+        if len(self.categorical) > 0:
+            for cat_name in sorted(self.categorical):
+                for category in sorted(self.feature_map[cat_name]):
+                    names.append(cat_name + "_" + category)
+
+        return names
