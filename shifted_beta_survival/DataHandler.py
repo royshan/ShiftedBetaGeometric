@@ -29,7 +29,7 @@ class DataHandler(object):
     adjusting all lists of cohort population to have the same length.
     """
 
-    def __init__(self, age, alive, features=None, bias=True, standard=True):
+    def __init__(self, age, alive, features=None, bias=True, normalize=True):
         """
         The object is initialized with the dataset to be transformed, the name
         of the fields identified as cohort, individual age and optional
@@ -39,8 +39,15 @@ class DataHandler(object):
             The column name to identify the age of each individual. Age has to
             be an integer value, and will determine the time intervals the
             model with work with.
+
+        :param alive:
+        :param features:
+        :param bias:
+        :param normalize:
+        :return:
         """
 
+        # Age and alive fields
         self.age = age
         self.alive = alive
 
@@ -67,15 +74,22 @@ class DataHandler(object):
         # should bias be added
         self.add_bias = bias
 
-        # stadarize features?
-        self.standard = standard
+        # standarize features?
+        self.normalize = normalize
+        self.stats = {'mean': {}, 'std': {}}
 
     @staticmethod
     def _get_categoricals(df, features):
+        """
+
+        :param df:
+        :param features:
+        :return:
+        """
 
         # No features? No problem!
         if features is None:
-            return [], []
+            return [], {}, []
 
         # Yes Features? Do stuff!!
         cat_list = df.columns[df.dtypes == 'category']
@@ -98,29 +112,56 @@ class DataHandler(object):
         return cat, feat_map, num
 
     def _one_hot_encode(self, df, categoricals):
+        """
 
+        :param df:
+        :param categoricals:
+        :return:
+        """
+
+        # dict to hold matrices of OHE features
         ohed_map = {}
 
         # Loop over each categorical feature and create appropriate feature
         # maps and what not
         for feature in categoricals:
+            # categoricals:
+            #      feature:
             ohed_map[feature] = np.zeros((df.shape[0],
                                           len(self.feature_map[feature])),
                                          dtype=int)
 
         warning_new = {}
 
+        # Internal function that is passed to pandas' apply method.
         def update_ohe_matrix(row, categorical_columns):
 
-            for feature in categorical_columns:
+            for curr_feature in categorical_columns:
+                # categoricals:
+                # curr_feature:
+
+                # Index of current row
+                row_index = row.name
+
+                # Value of current feature in current row
+                row_feat_val = row[curr_feature]
+
                 try:
-                    ohed_map[feature][row.name,
-                                      self.feature_map[feature][row[feature]]] += 1
+                    # Map between current categorical row-feature value and its
+                    # numerical representation
+                    mapped_val = self.feature_map[curr_feature][row_feat_val]
+
+                    # Update OHE matrix by adding one to the appropriate column
+                    # in the current row
+                    ohed_map[curr_feature][row_index, mapped_val] += 1
                 except KeyError:
                     try:
-                        warning_new[feature].add(row[feature])
+                        # Add newly seen value to warning dict
+                        warning_new[curr_feature].add(row_feat_val)
                     except KeyError:
-                        warning_new[feature] = {row[feature]}
+                        # If warning dict hasn't been populated yet,
+                        # we do it here.
+                        warning_new[curr_feature] = {row_feat_val}
 
         df.apply(lambda row: update_ohe_matrix(row, categoricals),
                  axis=1)
@@ -131,6 +172,11 @@ class DataHandler(object):
         return np.concatenate([xohe for key, xohe in ohed_map.items()], axis=1)
 
     def fit(self, df):
+        """
+
+        :param df:
+        :return:
+        """
 
         # Get types of features (in place updates!)
         cat, feat_map, num = self._get_categoricals(df=df, features=self.features)
@@ -138,9 +184,23 @@ class DataHandler(object):
         # store features
         self.categorical.extend(cat)
         self.feature_map = feat_map
+
+        # numerical
         self.numerical.extend(num)
+        # should be center and standard?
+        if self.normalize and len(self.numerical) > 0:
+            # pandas is awesome!
+            stats = df[self.numerical].describe().T.to_dict()
+            # update means and stds at once =)
+            self.stats['mean'].update(stats['mean'])
+            self.stats['std'].update(stats['std'])
 
     def transform(self, df):
+        """
+
+        :param df:
+        :return:
+        """
 
         if self.add_bias:
             xout = np.ones((df.shape[0], 1), dtype=int)
@@ -149,12 +209,24 @@ class DataHandler(object):
 
         # do we have numerical stuff?
         if len(self.numerical) > 0:
+
+            # Numerical variables!
+            num_vals = df[sorted(self.numerical)].values
+
+            if self.normalize:
+                for col, num_feat in enumerate(sorted(self.numerical)):
+                    #    col:
+                    # n_feat:
+                    num_vals[:, col] -= self.stats['mean'][num_feat]
+                    # Some arbitrary clip on minimum STD lest thigns break
+                    num_vals[:, col] /= max(self.stats['std'][num_feat], 1e-4)
+
             # bias?
             if self.add_bias:
-                xout = np.concatenate((xout, df[self.numerical].values),
+                xout = np.concatenate((xout, num_vals),
                                       axis=1)
             else:
-                xout = df[self.numerical].values
+                xout = num_vals
 
         if len(self.categorical) > 0:
 
@@ -173,4 +245,12 @@ class DataHandler(object):
 
         return xout, df[self.age].values, df[self.alive].values
 
+    def fit_transform(self, df):
+        """
 
+        :param df:
+        :return:
+        """
+
+        self.fit(df)
+        return self.transform(df)

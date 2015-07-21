@@ -12,6 +12,7 @@ def get_data(nrows=10000):
     df['origin'] = df['origin'].astype('category')
     df['frequency'] = df['frequency'].astype('category')
     df['profession'] = df['profession'].astype('category')
+    df['lamount'] = np.log(df.amount + 1)
     return df
 
 def test_get_cats():
@@ -21,13 +22,18 @@ def test_get_cats():
 
     dh = DataHandler(age='age',
                      alive='alive',
-                     features=['origin', 'profession', 'frequency', 'amount'],
-                     #features=['amount'],
-                     bias=False
+                     features=['origin', 'profession', 'frequency', 'amount', 'lamount'],
+                     #features=['amount', 'lamount'],
+                     bias=True,
+                     normalize=True
                      )
 
     dh.fit(df)
-    dh.transform(te)
+    x, y, z = dh.transform(te)
+
+    print(x)
+    print(dh.stats)
+    print(dh.feature_map)
 
 if __name__ == '__main__':
 
