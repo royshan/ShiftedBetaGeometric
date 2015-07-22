@@ -17,8 +17,8 @@ def get_data(nrows=10000):
 
 def test_get_cats():
 
-    df = get_data(nrows=500)
-    te = get_data()
+    df = get_data(nrows=100)
+    te = get_data(nrows=250)
 
     dh = DataHandler(age='age',
                      alive='alive',
@@ -29,6 +29,7 @@ def test_get_cats():
                      )
 
     dh.fit(df)
+    dh.transform(df)
     x, y, z = dh.transform(te)
 
     print(x)

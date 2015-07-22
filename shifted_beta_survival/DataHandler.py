@@ -137,15 +137,20 @@ class DataHandler(object):
 
         warning_new = {}
 
+        # Mutable object to store index changes! No need for pandas index, phew!
+        # using a mutable list seemed like the easiest answer, even if its a bit
+        # ugly.
+        currow_mutable = [0, ]
+
         # Internal function that is passed to pandas' apply method.
-        def update_ohe_matrix(row, categorical_columns):
+        def update_ohe_matrix(row, categorical_columns, currow):
 
             for curr_feature in categorical_columns:
                 # categoricals:
                 # curr_feature:
 
                 # Index of current row
-                row_index = row.name
+                row_index = currow[-1]
 
                 # Value of current feature in current row
                 row_feat_val = row[curr_feature]
@@ -167,7 +172,10 @@ class DataHandler(object):
                         # we do it here.
                         warning_new[curr_feature] = {row_feat_val}
 
-        df.apply(lambda row: update_ohe_matrix(row, categoricals),
+            currow[-1] += 1
+
+        # apply function
+        df.apply(lambda row: update_ohe_matrix(row, categoricals, currow_mutable),
                  axis=1)
 
         if len(warning_new) > 0:
@@ -204,10 +212,15 @@ class DataHandler(object):
 
     def transform(self, df):
         """
+        should transform have the option of working with a dataframe missing
+        the "target" variables (age and alive)? while these are not necessary
+        for computing the survival and churn curves, they are used when making
+        ltv predicitons.
 
         :param df:
         :return:
         """
+        # write a better message!
         if not self.fitted_model:
             raise RuntimeError("Fit to data before transforming it.")
 
@@ -283,6 +296,9 @@ class DataHandler(object):
             names.extend(sorted(self.numerical))
 
         if len(self.categorical) > 0:
+            # Sort everything to avoid naming things incorrectly. Notice
+            # that all names should be sorted in their origin. However,
+            # it doesn't hurt to be extra safe..
             for cat_name in sorted(self.categorical):
                 for category in sorted(self.feature_map[cat_name]):
                     names.append(cat_name + "_" + category)

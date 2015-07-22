@@ -399,11 +399,27 @@ class ShiftedBeta(object):
 
         :return: DERL
         """
+        # only positive ages, please
+        try:
+            min_age = min(age)
+        except TypeError:
+            min_age = 1.0 * age
+        finally:
+            # age cannot be negative!
+            if min_age < 1:
+                raise ValueError("All ages must be positive. A value of "
+                                 "{} was passed.".format(min_age))
+            del min_age
 
         alpha, beta = self._compute_alpha_beta(X, self.alpha, self.beta)
 
         # To make it so that the formula resembles that of the paper we define
         # the parameter n as below.
+        # In the paper n is related to the n-th contract period, starting at
+        # one. And all calculations are done with respect to the moment right
+        # before the end of such period, the moment prior to the customer
+        # making the decision to renew his membership. Which matches precisely
+        # the notion of age used throughout.
         n = age
 
         # The equation is two long, so we break in two parts.

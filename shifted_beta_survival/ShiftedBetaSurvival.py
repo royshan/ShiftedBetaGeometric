@@ -64,9 +64,6 @@ class ShiftedBetaSurvival(object):
             Number of times to restart the optimization procedure with a
             different seed, to avoid getting stuck on local maxima.
         """
-        # Deal with DF index problem! If its not a perfect range(df.shape[0]) the
-        # code will break! Is there an easy way of checking with minimal
-        # computational load?
         x, y, z = self.dh.fit_transform(df)
 
         # fit to data!
@@ -92,28 +89,20 @@ class ShiftedBetaSurvival(object):
     def _predict_coefficients(self, X):
         return self.sb.predict(X)
 
-    def predict_ltv(self, df, key=None, **kwargs):
+    def predict_ltv(self, df, **kwargs):
         """
 
         :param df:
         :param kwargs:
         :return:
         """
-        if self.features is None:
-            x = None
-        else:
-            x = df[self.features].values
+        # thinking about how to handle the fact that age and alive could,
+        # in principle not be present in the dataset.
+        x, y, z = self.dh.transform(df=df)
 
-        params = self._predict_coefficients(x)
+        ltvs = self.sb.derl(x, age=1, alive=1, **kwargs)
 
-        ltvs = self.derl(params[:, 0], params[:, 1], renewals=df[self.age].values, **kwargs)
-
-        if key is None:
-            return pandas.DataFrame(data=ltvs, columns=['ltv'])
-        else:
-            out = df[[key]].copy()
-            out['ltv'] = ltvs
-            return out
+        return pandas.DataFrame(data=ltvs, columns=['ltv'])
 
     def churn_p_of_t(self, n_periods=12):
         """
