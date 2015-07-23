@@ -159,7 +159,7 @@ class ShiftedBeta(object):
         return p_new, s_old
 
     @staticmethod
-    def _compute_alpha_beta(X, w_a, w_b):
+    def compute_alpha_beta(X, w_a, w_b):
         """
         This method computes the float values of alpha and beta given a matrix
         of predictors X and an array of weighs wa and wb. It does so by taking
@@ -230,7 +230,7 @@ class ShiftedBeta(object):
         log_like -= l2_reg
 
         # get real alpha and beta
-        alpha, beta = self._compute_alpha_beta(X, wa, wb)
+        alpha, beta = self.compute_alpha_beta(X, wa, wb)
 
         # loop over data doing stuff
         for y, z, a, b in zip(age, alive, alpha, beta):
@@ -411,7 +411,7 @@ class ShiftedBeta(object):
                                  "{} was passed.".format(min_age))
             del min_age
 
-        alpha, beta = self._compute_alpha_beta(X, self.alpha, self.beta)
+        alpha, beta = self.compute_alpha_beta(X, self.alpha, self.beta)
 
         # To make it so that the formula resembles that of the paper we define
         # the parameter n as below.
@@ -452,7 +452,7 @@ class ShiftedBeta(object):
         # Load alpha and beta sampled from the posterior. These fully
         # determine the beta distribution governing the customer level
         # churn rates
-        alpha, beta = self._compute_alpha_beta(X, self.alpha, self.beta)
+        alpha, beta = self.compute_alpha_beta(X, self.alpha, self.beta)
 
         # set the number of samples
         n_samples = X.shape[0]

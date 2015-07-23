@@ -30,9 +30,10 @@ def test_get_cats():
 
     dh.fit(df)
     dh.transform(df)
-    x, y, z = dh.transform(te)
+    x, y, z = dh.transform(te[['origin', 'profession', 'frequency', 'amount', 'lamount', 'is_contractor', 'age']])
+    #x, y, z = dh.transform(te)
 
-    print(x)
+    print(x, y, z)
     print(dh.stats)
     print(dh.feature_map)
 

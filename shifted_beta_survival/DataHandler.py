@@ -266,7 +266,17 @@ class DataHandler(object):
         if xout is None:
             raise ValueError('No data!')
 
-        return xout, df[self.age].values, df[self.alive].values
+        # When transforming the dataset, age and alive field must not be always
+        # present. If that's the case, we return None. To make life easier, and
+        # avoid an ugly chain of if statements, we create a nice little
+        # function to handle it.
+        def returner(data_frame, key):
+            try:
+                return data_frame[key].values
+            except KeyError:
+                return None
+
+        return xout, returner(df, self.age), returner(df, self.alive)
 
     def fit_transform(self, df):
         """
