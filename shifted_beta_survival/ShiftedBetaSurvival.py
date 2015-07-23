@@ -12,11 +12,12 @@ class ShiftedBetaSurvival(object):
     what is this?
     """
 
-    def __init__(self,
-                 cohort,
-                 age,
-                 category=None,
+    def __init__(self, age,
+                 alive,
+                 features=None,
                  gamma=1.0,
+                 gamma_beta=1.0,
+                 bias=True,
                  verbose=False):
         """
         stuff ...
@@ -28,7 +29,6 @@ class ShiftedBetaSurvival(object):
         :param verbose:
         :return:
         """
-
         # ORIGINAL DATA
         # The original dataset is stored in the following two variables.
         #   df: Original data in its original format
@@ -40,9 +40,34 @@ class ShiftedBetaSurvival(object):
         # COLUMN'S NAMES
         # The names of the columns used as cohort, age and category throughout
         # the code.
-        self.cohort = cohort
         self.age = age
-        self.category = category
+        self.alive = alive
+
+        # whether or not we should add a bias
+        self.bias = bias
+
+        # If the category name was passed as a single string, we turn it into
+        # a list of one element (not list of characters, as you would get with
+        # list('abc').
+        if isinstance(features, str):
+            features = [features]
+        # Try to explicitly transform category to a list (perhaps it was passed
+        # as a tuple or something. If it was None to begin with, we catch a
+        # TypeError and move on.
+        try:
+            self.features = sorted(features)
+        except TypeError:
+            self.features = None
+            # Set bias to true if no features are being used
+            self.bias = True
+
+        if bias:
+            if self.features is None:
+                self.names = ['bias']
+            else:
+                self.names = ['bias'] + self.features
+        else:
+            self.names = self.features
 
         # SHIFTED-BETA-GEOMETRIC MODEL
         # Since the training data is only available at training time (upon
@@ -50,13 +75,6 @@ class ShiftedBetaSurvival(object):
         # ShiftedBEta object, so we simple initialize it as None.
         self.sb = None
         self.sb_params = None
-
-        # DATA-HANDLER OBJECT
-        # The DataHandler object may be created without the training data, so
-        # we do it here.
-        self.dh = DataHandler(cohort=self.cohort,
-                              age=self.age,
-                              category=self.category)
 
         # Instance parameters used to hold the post-train values of alpha and
         # beta.
@@ -78,13 +96,38 @@ class ShiftedBetaSurvival(object):
                              " {} was passed.".format(gamma))
         self.gamma = gamma
 
+        if gamma_beta is None:
+            # Use gamma value by default
+            self.gamma_beta = gamma
+        else:
+            # make sure is not zero
+            if gamma_beta < 0:
+                raise ValueError("The regularization constant gamma must be a "
+                                 "non-negative real number. A negative value of"
+                                 " {} was passed.".format(gamma))
+
+            self.gamma_beta = gamma_beta
+
         # trained?
         self.trained = False
 
         # verbose controller
         self.verbose = verbose
 
-    def fit(self, df, restarts=50):
+        # Create objects!
+        # DATA-HANDLER OBJECT
+        # The DataHandler object may be created without the training data, so
+        # we do it here.
+        #self.dh = DataHandler()
+
+        # Shifted beta model object
+        # create shifted beta object
+        self.sb = ShiftedBeta(gamma_alpha=self.gamma,
+                              gamma_beta=self.gamma_beta,
+                              add_bias=self.bias,
+                              verbose=self.verbose)
+
+    def fit(self, df, restarts=1):
         """
         A fit method to train the model.
 
@@ -99,18 +142,23 @@ class ShiftedBetaSurvival(object):
             different seed, to avoid getting stuck on local maxima.
         """
 
-        # Set a bunch of instance parameters
-        self.df = df
-        self.data = self.dh.paired_data(df)
-
-        # create shifted beta object
-        self.sb = ShiftedBeta(self.data,
-                              gamma=self.gamma,
-                              verbose=self.verbose)
+        if self.features is None:
+            x = None
+        else:
+            x = df[self.features].values
+        # targets
+        y = df[self.age].values.astype(int)
+        z = df[self.alive].values.astype(int)
 
         # fit to data!
-        self.sb.fit(restarts=restarts)
-        self.sb_params = self.sb.get_params()
+        self.sb.fit(X=x,
+                    age=y,
+                    alive=z,
+                    restarts=restarts)
+
+        alpha, beta = self.sb.get_params()
+        self.sb_params = dict(alpha=dict(zip(self.names, alpha)),
+                              beta=dict(zip(self.names, beta)))
 
         # Trained successful means training is done!
         self.trained = True
@@ -125,39 +173,12 @@ class ShiftedBetaSurvival(object):
         if not self.trained:
             raise RuntimeError('Train the model first!')
 
-        # Some info
-        out = pandas.DataFrame(columns=['Category',
-                                        'Value',
-                                        'Coefficient Alpha',
-                                        'Coefficient Beta',
-                                        'Alpha',
-                                        'Beta',
-                                        'Avg Churn'])
+        out = pandas.DataFrame(self.sb_params)
 
-        row = 0
-        # category loop
-        for category, val_list in self.sb.get_params()['categories'].items():
+        # Take exponential
+        out['exp(alpha)'] = numpy.exp(out['alpha'])
+        out['exp(beta)'] = numpy.exp(out['beta'])
 
-            # value loop
-            for value in val_list:
-
-                alpha = self.sb.get_coeffs()[category][value]['alpha']
-                beta = self.sb.get_coeffs()[category][value]['beta']
-
-                alpha_coeff = self.sb_params['coeffs']['alpha'][self.sb_params['imap'][category][value]][-1]
-                beta_coeff = self.sb_params['coeffs']['beta'][self.sb_params['imap'][category][value]][-1]
-
-                # Populate dataframe
-                out.loc[row] = [category,
-                                value,
-                                alpha_coeff,
-                                beta_coeff,
-                                alpha,
-                                beta,
-                                alpha / (alpha + beta)]
-
-                # Next row, please!
-                row += 1
         return out
 
     def get_coeffs(self):
@@ -167,61 +188,31 @@ class ShiftedBetaSurvival(object):
 
         return self.sb.get_coeffs()
 
-    def _coefficients_combination(self):
+    def _predict_coefficients(self, X):
+        return self.sb.predict(X)
 
-        categories = sorted(self.sb_params['categories'])
-        print(categories)
-
-        for i, category_1 in enumerate(categories):
-            for j, category_2 in enumerate(categories[i + 1:]):
-
-                # for k, value_1 in
-
-                combo = category_1 + "_" + category_2
-
-                print(combo)
-
-        return 0
-
-    def _predict_coefficients(self, row):
-        """
-
-        :param row:
-        :return:
-        """
-
-        # bool map to pick up correct coefficients
-        bool_map = numpy.zeros(self.sb_params['n_categories'], dtype=bool)
-
-        for category in self.category:
-            # turn appropriate entries to True
-            bool_map[self.sb_params['imap'][category][row[category]]] = True
-
-        # log of sum of coeffs
-        log_alpha = self.sb_params['coeffs']['alpha'][bool_map].sum()
-        log_beta = self.sb_params['coeffs']['beta'][bool_map].sum()
-
-        # return values
-        return dict(alpha=exp(log_alpha), beta=exp(log_beta))
-
-    def _predict_row(self, row, **kwargs):
-        """
-
-        :param row:
-        :param kwargs:
-        :return:
-        """
-        params = self._predict_coefficients(row)
-        return self.derl(alpha=params['alpha'], beta=params['beta'], **kwargs)
-
-    def predict_ltv(self, df, **kwargs):
+    def predict_ltv(self, df, key=None, **kwargs):
         """
 
         :param df:
         :param kwargs:
         :return:
         """
-        return df.apply(lambda row: self._predict_row(row, **kwargs), axis=1).values
+        if self.features is None:
+            x = None
+        else:
+            x = df[self.features].values
+
+        params = self._predict_coefficients(x)
+
+        ltvs = self.derl(params[:, 0], params[:, 1], renewals=df[self.age].values, **kwargs)
+
+        if key is None:
+            return pandas.DataFrame(data=ltvs, columns=['ltv'])
+        else:
+            out = df[[key]].copy()
+            out['ltv'] = ltvs
+            return out
 
     def churn_p_of_t(self, n_periods=12):
         """
@@ -375,72 +366,6 @@ class ShiftedBetaSurvival(object):
         out.index = range(out.shape[0])
 
         return out
-
-    def ltv(self, arpu=1.0, discount_rate=0.005, renewals=0):
-        """
-        This method calculates the full residual LTV given the model's
-        parameters alpha, beta in addition to arpu, discount_rate, number of
-        renewals.
-
-        It uses the DERL equation derived in [2] to obtain the residual tenure
-        of a customer.
-
-        This function may return either the full distribution for the residual
-        LTV given alpha's and beta's distribution, or, instead, the expected
-        value.
-
-        :param arpu: Float
-            A flat value for the average revenue per user to be used by the
-            DERL function.
-
-        :param discount_rate: Float
-            A fixed discounted rate.
-
-        :param renewals: Int
-            Number of times the customer has renewed his or her subscription.
-
-        :return: Float / ndarray
-            Either a float with the expected value for the residual LTV or a
-            ndarray with the distribution given alpha and beta.
-        """
-        # Spot checks making sure the values passed make sense!
-        if arpu < 0:
-            raise ValueError("ARPU must be a non-negative number.")
-
-        if discount_rate <= 0:
-            raise ValueError("The discount rate must be a positive number.")
-
-        if renewals < 0 or not isinstance(renewals, int):
-            raise ValueError("The number of renewals must be a non-zero "
-                             "integer")
-
-        if not self.trained:
-            raise RuntimeError('Train the model first!')
-
-        # The usual empty dict to hold a dict of dicts of results
-        ltv_by_cate = {}
-
-        # category loop
-        for category, val_dict in self.sb.get_coeffs().items():
-
-            # add category dict
-            ltv_by_cate[category] = {}
-
-            for value, param in val_dict.items():
-
-                ltv_by_cate[category][value] = \
-                    self.derl(alpha=param['alpha'],
-                              beta=param['beta'],
-                              arpu=arpu,
-                              discount_rate=discount_rate,
-                              renewals=renewals)
-
-        return ltv_by_cate
-
-    def capped_ltv(self):
-        if not self.trained:
-            raise RuntimeError('Train the model first!')
-        print('Not implemented yet, use ltv instead.')
 
     @staticmethod
     def derl(alpha, beta, arpu=1.0, discount_rate=0.005, renewals=0):
