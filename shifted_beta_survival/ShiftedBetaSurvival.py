@@ -15,7 +15,7 @@ class ShiftedBetaSurvival(object):
                  alive,
                  features=None,
                  gamma=1.0,
-                 gamma_beta=1.0,
+                 gamma_beta=None,
                  bias=True,
                  normalize=True,
                  verbose=False):
@@ -43,6 +43,9 @@ class ShiftedBetaSurvival(object):
                               normalize=normalize)
 
         # Shifted beta model object
+        # Was a different gammab parameter passed?
+        if gamma_beta is None:
+            gamma_beta = 1.0 * gamma
         # create shifted beta object
         self.sb = ShiftedBeta(gamma_alpha=gamma,
                               gamma_beta=gamma_beta,
