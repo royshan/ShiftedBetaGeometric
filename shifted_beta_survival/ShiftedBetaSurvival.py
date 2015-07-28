@@ -93,85 +93,87 @@ class ShiftedBetaSurvival(object):
         :param df:
         :return:
         """
-        # thinking about how to handle the fact that age and alive could,
-        # in principle not be present in the dataset.
         x, y, z = self.dh.transform(df=df)
         alpha, beta = self.sb.compute_alpha_beta(x, self.sb.alpha, self.sb.beta)
 
         return pd.DataFrame(data=np.vstack([alpha, beta]),
                             index=['alpha', 'beta']).T
 
-    def predict_churn(self, df, use_df_fields=False, **kwargs):
+    def predict_churn(self, df, age=None, **kwargs):
         """
         Predict alpha and beta for each sample
 
         :param df:
         :return:
         """
-        # thinking about how to handle the fact that age and alive could,
-        # in principle not be present in the dataset.
         x, y, z = self.dh.transform(df=df)
 
         # If age field is present in prediction dataframe, we may choose to
         # use it to calculate future churn.
-        if use_df_fields:
-            if y is None:
-                raise RuntimeError("Age field not present in dataframe.")
+        if age is None:
+            age = y
+        if age is None:
+            raise RuntimeError('The "age" field must either be present in '
+                               'the dataframe or passed separately as an '
+                               'argument.')
 
-            out = pd.DataFrame(data=self.sb.churn_p_of_t(x, age=y, **kwargs))
-        else:
-            out = pd.DataFrame(data=self.sb.churn_p_of_t(x, **kwargs))
+        out = pd.DataFrame(data=self.sb.churn_p_of_t(x, age=age, **kwargs))
 
         out.columns = ['period_{}'.format(col)
                        for col in range(1, out.shape[1] + 1)]
 
         return out
 
-    def predict_survival(self, df, use_df_fields=False, **kwargs):
+    def predict_survival(self, df, age=None, **kwargs):
         """
         Predict alpha and beta for each sample
 
         :param df:
         :return:
         """
-        # thinking about how to handle the fact that age and alive could,
-        # in principle not be present in the dataset.
         x, y, z = self.dh.transform(df=df)
 
         # If age field is present in prediction dataframe, we may choose to
         # use it to calculate future churn.
-        if use_df_fields:
-            if y is None or z is None:
-                raise RuntimeError("Age fields not present in dataframe.")
+        if age is None:
+            age = y
+        if age is None:
+            raise RuntimeError('The "age" field must either be present in '
+                               'the dataframe or passed separately as an '
+                               'argument.')
 
-            out = pd.DataFrame(data=self.sb.survival_function(x,
-                                                              age=y,
-                                                              **kwargs))
-        else:
-            out = pd.DataFrame(data=self.sb.survival_function(x, **kwargs))
+        out = pd.DataFrame(data=self.sb.survival_function(x,
+                                                          age=age,
+                                                          **kwargs))
 
         out.columns = ['period_{}'.format(col)
                        for col in range(1, out.shape[1] + 1)]
 
         return out
 
-    def predict_ltv(self, df, use_df_fields=False, **kwargs):
+    def predict_ltv(self, df, age=None, alive=None, **kwargs):
         """
 
         :param df:
         :param kwargs:
         :return:
         """
-        # thinking about how to handle the fact that age and alive could,
-        # in principle not be present in the dataset.
         x, y, z = self.dh.transform(df=df)
 
-        if use_df_fields:
-            if y is None or z is None:
-                raise RuntimeError("Fields not present in dataframe.")
+        if age is None:
+            age = y
+        if age is None:
+            raise RuntimeError('The "age" field must either be present in '
+                               'the dataframe or passed separately as an '
+                               'argument.')
 
-            ltvs = self.sb.derl(x, age=y, alive=z, **kwargs)
-        else:
-            ltvs = self.sb.derl(x, age=1, alive=1, **kwargs)
+        if alive is None:
+            alive = z
+        if alive is None:
+            raise RuntimeError('The "alive" must either be present in the '
+                               'dataframe or passed separately as an '
+                               'argument.')
+
+        ltvs = self.sb.derl(x, age=age, alive=alive, **kwargs)
 
         return pd.DataFrame(data=ltvs, columns=['ltv'])

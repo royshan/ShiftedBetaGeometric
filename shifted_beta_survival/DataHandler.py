@@ -199,7 +199,7 @@ class DataHandler(object):
 
         # numerical
         self.numerical.extend(num)
-        # should be center and standard?
+        # should we center and standard?
         if self.normalize and len(self.numerical) > 0:
             # pandas is awesome!
             stats = df[self.numerical].describe().T.to_dict()

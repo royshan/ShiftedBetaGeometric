@@ -6,9 +6,10 @@ install_requires = [
     'pandas',
     ]
 
-setup(name='',
+setup(name='Shifted Beta-Geometric Survival Analysis',
       version='0.1',
-      description='',
+      description='An alternative to survival analysis using '
+                  'the shifted beta-geometric model.',
       classifiers=[
           "Programming Language :: Python :: 2.7",
           "Programming Language :: Python :: 3.4",
