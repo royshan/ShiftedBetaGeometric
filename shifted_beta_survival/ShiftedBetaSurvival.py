@@ -72,10 +72,19 @@ class ShiftedBetaSurvival(object):
 
     def summary(self):
         """
+        Simple method to get the learned weights and their corresponding
+        categories
 
-        :return:
+        :return: pandas DataFrame
+            A DataFrame object with alpha and beta weights for each category
         """
-        return 0
+        suma = pd.DataFrame(data={name: (a, b) for name, a, b in
+                                  zip(self.dh.get_names(),
+                                      self.sb.alpha,
+                                      self.sb.beta)},
+                            index=['w_alpha', 'w_beta']
+                            ).T
+        return suma
 
     def predict_params(self, df):
         """

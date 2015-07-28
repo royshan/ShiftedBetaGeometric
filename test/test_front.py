@@ -30,7 +30,7 @@ def article_data():
 
     sbs = ShiftedBetaSurvival(age='age', alive='alive', features='category',
                               gamma=1, verbose=True)
-    sbs.fit(data, restarts=2)
+    sbs.fit(data, restarts=1)
 
     #print(sbs.predict_params(data))
     print(sbs.predict_survival(data, True))
