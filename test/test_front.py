@@ -29,11 +29,11 @@ def article_data():
     data['category'] = data['category'].astype('category')
 
     sbs = ShiftedBetaSurvival(age='age', alive='alive', features='category',
-                              gamma=1, verbose=True)
-    sbs.fit(data, restarts=1)
+                              gamma=1e-3, verbose=True)
+    sbs.fit(data, restarts=5)
 
-    #print(sbs.predict_params(data))
-    print(sbs.predict_survival(data, True))
+    print(sbs.predict_params(data))
+    #print(sbs.predict_survival(data, True))
 
 if __name__ == '__main__':
 

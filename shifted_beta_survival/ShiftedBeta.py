@@ -232,8 +232,12 @@ class ShiftedBeta(object):
         # get real alpha and beta
         alpha, beta = self.compute_alpha_beta(X, wa, wb)
 
+        index = np.arange(alpha.shape[0])
+        np.random.shuffle(index)
+        index = index[:0.5 * index.shape[0]]
+
         # loop over data doing stuff
-        for y, z, a, b in zip(age, alive, alpha, beta):
+        for y, z, a, b in zip(age[index], alive[index], alpha[index], beta[index]):
 
             # add contribution of current customer to likelihood
             log_like += np.log(self._recursive_retention_stats(a, b, y)[z])
