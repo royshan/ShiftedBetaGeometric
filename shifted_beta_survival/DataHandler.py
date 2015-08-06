@@ -6,26 +6,13 @@ class DataHandler(object):
     DataHandler is an object to perform several manipulations to a pandas
     dataframe making it suitable to be fed to a ShiftedBeta object.
 
-    Given a pandas dataframe of the kind:
-    _______
-    id | cohort | age | predictors...
-    1  |      a |   3 | ...
-    2  |      b |   7 | ...
-    3  |      a |   4 | ...
-    ...
+    Given a dataframe the user specifies an age and alive fields, and possible
+    feature fields. These will be processed to comply with the input API of
+    the lower lever ShiftedBeta object.
 
-    DataHandler turns it into a dictionary with key: list of cohort
-    populations, key-value pairs.
-
-    Additionally it can compute the number of individuals lost per cohort
-    returning a similar dictionary as above with key: number of lost
-    individuals pairs.
-
-    Moreover a method to zip population with number of lost individuals
-    exist, which is precisely the format accepted by a shifted beta object.
-
-    Finally it is also capable of padding smaller cohorts with zeros
-    adjusting all lists of cohort population to have the same length.
+    Categorical features will be one-hot-encoded, a bias column can be added,
+    and numerical features can also be normalized during the pre-processing
+    stage.
     """
 
     def __init__(self, age, alive, features=None, bias=True, normalize=True):
@@ -39,16 +26,33 @@ class DataHandler(object):
             be an integer value, and will determine the time intervals the
             model with work with.
 
-        :param alive:
-        :param features:
-        :param bias:
-        :param normalize:
-        :return:
+        :param alive: str
+            The column name with the status of each individual. In the context
+            of survival analysis, an individual may be dead or alive, and its
+            contribution to the model will depend on it.
+
+        :param features: str, list or None
+            A string with the name of the column to be used as features, or a
+            list of names of columns to be used as features or None, if no
+            features are to be used.
+
+        :param bias: bool
+            Whether or not a bias term should be added to the feature matrix.
+
+        :param normalize: bool
+            Whether or not numerical fields should be normalized (centered and
+            scaled to have std=1)
         """
 
-        # Age and alive fields
+        # The name of age and alive fields
         self.age = age
         self.alive = alive
+
+        # Make sure we have something to be used as a feature matrix. I.e.:
+        # features=None and bias=False should raise an error.
+        if features is None and not bias:
+            raise ValueError("bias must be True if no features are being used "
+                             "(features=None).")
 
         # If the category name was passed as a single string, we turn it into
         # a list of one element (not list of characters, as you would get with

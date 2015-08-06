@@ -22,9 +22,10 @@ def test_get_cats():
 
     dh = DataHandler(age='age',
                      alive='alive',
-                     features=['origin', 'profession', 'frequency', 'amount', 'lamount', 'is_contractor'],
+                     #features=['origin', 'profession', 'frequency', 'amount', 'lamount', 'is_contractor'],
                      #features=['amount', 'lamount'],
-                     bias=True,
+                     features=None,
+                     bias=False,
                      normalize=True
                      )
 

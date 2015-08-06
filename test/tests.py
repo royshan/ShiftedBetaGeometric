@@ -154,7 +154,7 @@ def sb_test2():
 def sb_test3():
 
     data = pandas.read_csv('../data/data_3yr.csv')
-    total_size = 5000#data.shape[0]
+    total_size = 500#data.shape[0]
     index = numpy.arange(data.shape[0])
     numpy.random.shuffle(index)
     index = index[:total_size]
@@ -174,17 +174,13 @@ def sb_test3():
     names = ['bias'] + names
 
     sb = ShiftedBeta(verbose=True, gamma_alpha=1e1, gamma_beta=1e1)
-    sb.fit(x, y, z, restarts=3)
+    sb.fit(x, y, z, restarts=1)
 
     print_stats(sb.alpha, sb.beta, [0], names)
     for i in range(1, len(names)):
         print_stats(sb.alpha, sb.beta, [0, i], names)
 
-    preds_coeff = sb.predict(x)
-    preds = data[['systemid']].copy()
-    preds['alpha'] = preds_coeff[:, 0]
-    preds['beta'] = preds_coeff[:, 1]
-    preds['churn'] = preds_coeff[:, 0] / (preds_coeff[:, 0] + preds_coeff[:, 1])
+    sb.survival_function(x, age=3*numpy.ones(500))
 
 
 def surv_plot():
@@ -251,8 +247,8 @@ if __name__ == '__main__':
     #sb_test(data[['category', 'random']], data['age'], data['alive'], names)
 
     #sb_test2()
-    #sb_test3()
-    surv_plot()
+    sb_test3()
+    #surv_plot()
 
     #sbs_test()
 
