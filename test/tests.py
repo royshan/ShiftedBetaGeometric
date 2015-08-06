@@ -189,10 +189,10 @@ def sb_test3():
 
 def surv_plot():
 
-    x, y, z, names = article_data(copies=2, random=False)
+    x, y, z, names = article_data(copies=10, random=False)
     x = numpy.concatenate((numpy.ones((x.shape[0], 1)), x), axis=1)
 
-    sb = ShiftedBeta(verbose=True, gamma_alpha=1e-1, gamma_beta=1e-1)
+    sb = ShiftedBeta(verbose=True, gamma_alpha=1e-3, gamma_beta=1e-3)
     sb.fit(x, y, z, restarts=1)
 
     print_stats(sb.alpha, sb.beta, [0], names)
@@ -202,8 +202,8 @@ def surv_plot():
     c = sb.churn_p_of_t(x[[0, -1], :], 0, n_periods=13)
     s = sb.survival_function(x[[0, -1], :], numpy.array([0, 0]), n_periods=13)
 
-    print(c)
-    print(s)
+    #print(c)
+    #print(s)
 
     fig = plt.figure(figsize=(16, 10))
     graph = fig.add_subplot(111)
@@ -217,7 +217,7 @@ def surv_plot():
     plt.title('Empirical and Modelled Survival Curves By Platform', fontsize=20)
     plt.xlabel('Months Since Upgrade')
     plt.ylabel('S(t)')
-    plt.show()
+    # plt.show()
 
 
 def sbs_test():
