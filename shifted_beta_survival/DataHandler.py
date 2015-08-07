@@ -268,9 +268,25 @@ class DataHandler(object):
 
     def fit(self, df):
         """
+        This method is responsible for scanning the dataframe -df- and storing
+        the necessary parameters and statistics used to pre-process all
+        features.
 
-        :param df:
-        :return:
+        It starts by splitting the full features list into a categorical and a
+        numerical list of features, while also creating the feature_map for
+        categorical features. This is done by invoking the _get_categoricals
+        method.
+
+        That being done, the next step is computing the mean and standard
+        deviations of all numerical features in case the normalize keyword was
+        set to True when the object was created. These statistics are stored
+        in a dictionary to be used at transformation time.
+
+        Finally the method sets the fitted_model flag to True.
+
+        :param df: pandas DataFrame
+            The dataframe on which categorical and numerical features will be
+            based.
         """
 
         # Get types of features (in place updates!)
