@@ -87,40 +87,71 @@ class DataHandler(object):
     @staticmethod
     def _get_categoricals(df, features):
         """
+        A method to sort features and divide them into categorical and
+        numerical, and storing the names in sorted lists.
 
-        :param df:
+        Moreover this method also construct the dictionary feat_map, which
+        takes categorical feature names as keys and a list with all the
+        values they take as values.
+
+        :param df: pandas DataFrame
+            pandas dataframe from which features will be extracted
+
         :param features:
-        :return:
+            list of columns names that will be used as features.
+
+        :return: tuple (list, dict, list)
+            A tuple with:
+                A list of names of categorical features
+                A dict with categorical feature name: all possible values
+                A list of names of numerical features
         """
 
-        # No features? No problem!
+        # No features? No problem! Return empty object and let the code deal
+        # with it further ahead.
         if features is None:
             return [], {}, []
 
         # Yes Features? Do stuff!!
+        # Start by identifying which features are categorical by checking the
+        # data types of columns in the dataframe. Those with data type
+        # "category" are added to the list.
         cat_list = df.columns[df.dtypes == 'category']
         cat_list = [cat for cat in cat_list if cat in features]
 
         # Update them categorical features
-        cat = sorted(cat_list)
+        cat_list = sorted(cat_list)
 
         # Build feature maps!
         feat_map = {}
 
-        for feature in cat:
+        # Loop over the list of categorical features creating a map that takes
+        # each factor to an integer, in alphabetical order. So if feature
+        # 'city' takes values 'NY', 'LA' and 'SF' the feature map will have the
+        # entry: {'city': {'LA': 0, 'NY': 1, 'SF': 2}, ...}. Similarly for all
+        # categorical features present.
+        for feature in cat_list:
             feat_map[feature] = dict(zip(sorted(df[feature].cat.categories),
                                          range(len(df[feature].cat.categories))))
 
-        # Update numerical features
-        num = sorted([feat for feat in features if feat not in cat])
+        # Update list of numerical features. Make it such any feature that was
+        # given by the user and it is not a categorical feature, will be
+        # considered a numerical feature.
+        num = sorted([feat for feat in features if feat not in cat_list])
 
         # Returns both lists
-        return cat, feat_map, num
+        return cat_list, feat_map, num
 
     def _one_hot_encode(self, df, categoricals):
         """
+        A method to one-hot-encode categorical features. It computes a dummy
+        matrix for each categorical column and returns a concatenation of all
+        such matrices.
 
-        :param df:
+
+        :param df: pandas DataFrame
+            Pandas dataframe from which features are to be extracted.
+
         :param categoricals:
         :return:
         """
@@ -130,15 +161,25 @@ class DataHandler(object):
         # dict to hold matrices of OHE features
         ohed_map = {}
 
-        # Loop over each categorical feature and create appropriate feature
-        # maps and what not
+        # Loop over each categorical feature and create appropriate dummy
+        # matrices. The size of the matrix is dictated by the feature_map
+        # instance variable, that, for each categorical feature, hold a dict
+        # with as many key: val pairs as there are factors in the training set
         for feature in categoricals:
-            # categoricals:
-            #      feature:
+            # categoricals: sorted list with names of categorical features
+            #      feature: name of a categorical feature
+
+            # Use the size of the dictionary to create a dummy matrix with the
+            # appropriate size. ** Redundant since dummy matrix need
+            # only to have n_factors - 1 columns, however this model only makes
+            # sense with a bias variable added, which takes care of that.
             ohed_map[feature] = np.zeros((df.shape[0],
                                           len(self.feature_map[feature])),
                                          dtype=int)
 
+        # Sometimes it is useful to know if new factors were found in the test
+        # set, so we create a dict to store a list of new factors found in each
+        # categorical feature.
         warning_new = {}
 
         # Mutable object to store index changes! No need for pandas index, phew!
@@ -148,17 +189,48 @@ class DataHandler(object):
 
         # Internal function that is passed to pandas' apply method.
         def update_ohe_matrix(row, categorical_columns, currow):
+            """
+            Given a row of a pandas DataFrame, this function updates all
+            dummy matrices corresponding to each categorical variables.
 
+            Notice that the feature_map variable was generated in a such a way
+            to immediately lends itself to populating an empty matrix in dummy
+            fashion.
+
+            So this function can simply use the value in the factor: value pair
+            to set to one the correct column in the dummy matrix.
+
+            As for rows, we use an external, mutable object to keep track of
+            which row the pandas object is reading the data from and use that
+            to update the correct row of the dummy matrices.
+
+            :param row: row of a pandas DataFrame
+                The row passed by the method apply of a pandas DataFrame.
+
+            :param categorical_columns: list
+                A list with the name of all categorical features that should be
+                one hot encoded.
+
+            :param currow: list (mutable object)
+                An external, mutable object used to keep track of which row of
+                the dataframe is being read (in case indexes are messed up).
+            """
+
+            # Loop over all categorical features
             for curr_feature in categorical_columns:
-                # categoricals:
-                # curr_feature:
+                # categorical_columns: list of names of categorical variables
+                #        curr_feature: name of categorical variable
 
-                # Index of current row
+                # Read the index of current row from external mutable object
                 row_index = currow[-1]
 
                 # Value of current feature in current row
                 row_feat_val = row[curr_feature]
 
+                # Sometimes the test set contains factors that were not present
+                # at training time, so we must take that into account. We do so
+                # by catching a KeyError generated by trying to read an invalid
+                # value off of a dictionary.
                 try:
                     # Map between current categorical row-feature value and its
                     # numerical representation
@@ -176,15 +248,22 @@ class DataHandler(object):
                         # we do it here.
                         warning_new[curr_feature] = {row_feat_val}
 
+            # Update the index so that the next row with be read the next time
+            # this function is invoked.
             currow[-1] += 1
 
-        # apply function
-        df.apply(lambda row: update_ohe_matrix(row, categoricals, currow_mutable),
+        # apply function with pandas apply method
+        df.apply(lambda row: update_ohe_matrix(row,
+                                               categoricals,
+                                               currow_mutable),
                  axis=1)
 
+        # Print some warking in case new factors were found.
         if len(warning_new) > 0:
             print('WARNING: NEW STUFF: {}'.format(warning_new))
 
+        # Return a matrix complized of all dummy matrices for each categorical
+        # variables concatenated along columns.
         return np.concatenate([xohe for key, xohe in ohed_map.items()], axis=1)
 
     def fit(self, df):
@@ -195,7 +274,8 @@ class DataHandler(object):
         """
 
         # Get types of features (in place updates!)
-        cat, feat_map, num = self._get_categoricals(df=df, features=self.features)
+        cat, feat_map, num = self._get_categoricals(df=df,
+                                                    features=self.features)
 
         # store features
         self.categorical.extend(cat)
