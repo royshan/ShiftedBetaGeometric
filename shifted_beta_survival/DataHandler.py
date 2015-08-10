@@ -312,65 +312,130 @@ class DataHandler(object):
 
     def transform(self, df):
         """
-        should transform have the option of working with a dataframe missing
-        the "target" variables (age and alive)? while these are not necessary
-        for computing the survival and churn curves, they are used when making
-        ltv predicitons.
+        A method to turn a pandas DataFrame into feature and target matrices
+        suitable for the ShiftedBeta object.
 
-        :param df:
-        :return:
+        Armed with he one-hot-encoding and (possible) centering and re-scaling
+        of the training data. This method will apply the learned
+        transformations to the dataframe in question.
+
+        It starts by constructing the feature matrix. It adds bias as needed
+        followed by extracting the numerical features, which are then centered
+        and re-scaled if self.normalize = True. Finally it contructs the one-
+        hot-encoding of the categorical features.
+
+        If no features were passed by the user, and the parameter bias is False
+        the feature matrix will come out as None, to avoid it, this method
+        adds a layer of protection by raising a ValueError.
+
+        Target features, age and alive, may or may not be present in the
+        dataframe. Since their presence is not strictly necessary, this method
+        can handle both scenarios. It does so by trying to extract the target
+        values, and, in case of failure, a value of None is return. This is
+        done with the help of the "return" function below.
+
+        :param df: pandas DataFrame
+            The pandas dataframe we want to transform.
+
+        :return: tuple (ndarray of shape(n_samples, n_features),
+                        ndarray of shape(n_samples, ) or None,
+                        ndarray of shape(n_samples, ) or None)
+            The feature matrix and corresponding target values (when they exist
+            otherwise None is returned).
         """
-        # write a better message!
+        # Make sure the object was trained first.
         if not self.fitted_model:
             raise RuntimeError("Fit to data before transforming it.")
 
+        # Add a bias columns (a columns of ones) to the feature matrix. Note
+        # that if not bias, then the feature matrix is given a temporary value
+        # of None.
         if self.add_bias:
             xout = np.ones((df.shape[0], 1), dtype=int)
         else:
             xout = None
 
-        # do we have numerical stuff?
+        # If the list self.numerical is not empty if means we have numerical
+        # features. If that is the case, proceed to extracting and transforming
+        # them as needed.
         if len(self.numerical) > 0:
 
-            # Numerical variables!
+            # Numerical variables extracted from dataframe in alphabetical
+            # order.
             num_vals = df[sorted(self.numerical)].values
 
+            # If self.normalize = True, proceed with centering and re-scaling.
             if self.normalize:
                 for col, num_feat in enumerate(sorted(self.numerical)):
-                    #    col:
-                    # n_feat:
+                    #    col: Position of column to be altered (recall that
+                    #         they are arranged in alphabetical order)
+                    # num_feat: the name of the numerical features (necessary
+                    #           to load stats from self.stats dictionary)
+
+                    # Center values by subtracting mean.
                     num_vals[:, col] -= self.stats['mean'][num_feat]
-                    # Some arbitrary clip on minimum STD lest things break
+                    # Re-scale by dividing by standard-deviation (with some
+                    # arbitrary clip on minimum STD lest things break)
                     num_vals[:, col] /= max(self.stats['std'][num_feat], 1e-4)
 
-            # bias?
+            # If bias is True, the feature matrix already exists and we simply
+            # append to it. However, if bias is False the feature matrix is
+            # overwritten from None to the numerical feature matrix created here.
             if self.add_bias:
                 xout = np.concatenate((xout, num_vals),
                                       axis=1)
             else:
                 xout = num_vals
 
+        # If the list self.categorical is not empty if means we have
+        # categorical features. If that is the case, proceed to extracting and
+        # one-hot-encoding them as needed.
         if len(self.categorical) > 0:
 
-            # get one hot encoded guys, sort categoricals just to be extra
-            # sure (they are already sorted down the line).
+            # Use method _one_hot_encode to ohe the features passed in the
+            # sorted self.categorical list. While this list has been sorted
+            # at the origin, we do so again here as an extra layer of
+            # protection.
             xohe = self._one_hot_encode(df, sorted(self.categorical))
 
-            # bias?
+            # By now, either the feature matrix xout is still None (in case of
+            # no bias and no numerical features) in which case it becomes the
+            # one-hot-encoded matrix we just created, or it is something (bias,
+            # numerical of both) in which case we append the OHE features to
+            # it.
             if xout is not None:
                 xout = np.concatenate((xout, xohe),
                                       axis=1)
             else:
                 xout = xohe
 
+        # If by this point the feature matrix is still None it means no data
+        # will be used, which is obviously a problem. While this should not be
+        # possible, and should be stopped at the object constructor, we add an
+        # extra layer of protection here and raise a Value Error just in case.
         if xout is None:
             raise ValueError('No data!')
 
-        # When transforming the dataset, age and alive field must not be always
-        # present. If that's the case, we return None. To make life easier, and
-        # avoid an ugly chain of if statements, we create a nice little
-        # function to handle it.
         def returner(data_frame, key):
+            """
+            When transforming the dataset, age and alive field must not be always
+            present. If that's the case, we return None. To make life easier, and
+            avoid an ugly chain of if statements, we create a nice little
+            function to handle it.
+
+            :param data_frame: pandas DataFrame
+                dataframe from which target variables will be extracted.
+
+            :param key: str
+                name of the target variable in question
+
+            :return: ndarray of shape(n_samples, ) or None
+                np.array will target values or None, if the target variable is
+                not present in dataframe.
+            """
+            # Try to extract target values, if the field is not present in the
+            # dataframe, pandas will raise a KeyError, we catch it and return
+            # None.
             try:
                 return data_frame[key].values
             except KeyError:
@@ -380,9 +445,18 @@ class DataHandler(object):
 
     def fit_transform(self, df):
         """
+        A method to implement both fit and transform in one shot. While these
+        two methods, when done together can be optimized, for simplicity (and
+        some laziness) we don't optimize anything here.
 
-        :param df:
-        :return:
+        :param df: pandas DataFrame
+            dataframe with features and target values
+
+        :return: tuple (ndarray of shape(n_samples, n_features),
+                        ndarray of shape(n_samples, ) or None,
+                        ndarray of shape(n_samples, ) or None)
+            The feature matrix and corresponding target values (when they exist
+            otherwise None is returned).
         """
 
         self.fit(df)
@@ -392,24 +466,34 @@ class DataHandler(object):
         """
         A handy function to return the names of all variables in the
         transformed version of the dataset in the correct order. Particularly
-        useful for the shiftedbetasurvival wrapper.
+        useful for the ShiftedBetaSurvival wrapper.
 
         :return: list
             list of names in correct order
         """
+        # Initialize an empty list to store the names
         names = []
 
+        # If bias is true (meaning we added bias) we add bias as the fiest
+        # name in the list.
         if self.add_bias:
             names.append('bias')
 
+        # If numerical features are being used, we added them. As usual, we
+        # make sure to sort them before doing so lest something weird happened.
         if len(self.numerical) > 0:
             names.extend(sorted(self.numerical))
 
+        # If categorical features are being used we must add them too. Here we
+        # use a two level naming convention: category_factor.
         if len(self.categorical) > 0:
             # Sort everything to avoid naming things incorrectly. Notice
             # that all names should be sorted in their origin. However,
             # it doesn't hurt to be extra safe..
             for cat_name in sorted(self.categorical):
+                # Use the feature map to get the name of all factor for the
+                # current category. Sort them and add to composite name to the
+                # list.
                 for category in sorted(self.feature_map[cat_name]):
                     names.append(cat_name + "_" + category)
 

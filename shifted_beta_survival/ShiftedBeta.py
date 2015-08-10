@@ -243,11 +243,11 @@ class ShiftedBeta(object):
         # ndarrays of shape (n_samples, )
         alpha, beta = self.compute_alpha_beta(X, wa, wb)
 
-        # loop over data and add the contribution to the loglikelihood from
+        # loop over data and add the contribution to the log-likelihood from
         # each sample in the dataset.
         # Notice that once we have alpha and beta for each sample we do not
         # need the feature matrix to compute the contribution to the
-        # loglikelihood.
+        # log-likelihood.
         for y, z, a, b in zip(age, alive, alpha, beta):
             # Variables:
             #   y: Age value (int)
