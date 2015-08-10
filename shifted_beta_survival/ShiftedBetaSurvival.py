@@ -7,7 +7,22 @@ import pandas as pd
 
 class ShiftedBetaSurvival(object):
     """
-    what is this?
+    This class implements an extended version of the Shifted-Beta-Geometric
+    model by P. Fader and B. Hardie.
+
+    The original model works by assuming a constant in time, beta distributed
+    individual probability of churn. Due to the heterogeneity of a cohort's
+    churn rates (since each individual will have a different probability of
+    churning), expected behaviours such as the decrease of cohort churn rate
+    over time arise naturally.
+
+    The extension done here generalizes the coefficients alpha and beta of the
+    original model to function of features on the individual level. A
+    log-linear model is used to construct alpha(x) and beta(x) and the
+    likelihood is then computed by combining the contributions of each and
+    every sample in the training set.
+
+    The model takes as inputs ...
     """
 
     def __init__(self,
@@ -20,16 +35,51 @@ class ShiftedBetaSurvival(object):
                  normalize=True,
                  verbose=False):
         """
+        Initializes objects with parameters necessary to create the supporting
+        objects: DataHandler and ShiftedBeta
 
-        :param age:
-        :param alive:
-        :param features:
-        :param gamma:
-        :param gamma_beta:
-        :param bias:
-        :param normalize:
-        :param verbose:
-        :return:
+        :param age: str
+            The column name to identify the age of each individual. Age has to
+            be an integer value, and will determine the time intervals the
+            model with work with.
+                --- See DataHandler.py
+
+        :param alive: str
+            The column name with the status of each individual. In the context
+            of survival analysis, an individual may be dead or alive, and its
+            contribution to the model will depend on it.
+                --- See DataHandler.py
+
+        :param features: str, list or None
+            A string with the name of the column to be used as features, or a
+            list of names of columns to be used as features or None, if no
+            features are to be used.
+                --- See DataHandler.py
+
+        :param gamma: float
+            A non-negative float specifying the strength of the regularization
+            applied to w_alpha (alpha's weights) and, if gamma_beta is not
+            given, it is also applied to beta.
+                --- See ShiftedBeta.py
+
+        :param gamma_beta: float
+            A non-negative float specifying the strength of the regularization
+            applied to w_beta (beta's weights). If specified, overwrites the
+            value of gamma for beta.
+                --- See ShiftedBeta.py
+
+        :param bias: bool
+            Whether or not a bias term should be added to the feature matrix.
+                --- See DataHandler.py
+
+        :param normalize: bool
+            Whether or not numerical fields should be normalized (centered and
+            scaled to have std=1)
+                --- See DataHandler.py
+
+        :param verbose: bool
+            Whether of not status updates should be printed
+                --- See ShiftedBeta.py
         """
 
         # Create objects!
@@ -53,7 +103,14 @@ class ShiftedBetaSurvival(object):
 
     def fit(self, df, restarts=1):
         """
-        A fit method to train the model.
+        A method responsible for learning both the transformation of the data,
+        including addition of a bias parameters, centering and re-scaling of
+        numerical features, and one-hot-encoding of categorical features. In
+        addition to learning the parameters alpha and beta of the shifted-beta-
+        geometric model.
+
+        This is just a wrapper, the real heavy-lifting is done by the
+        DataHandler and ShiftedBeta objects.
 
         :param df: pandas DataFrame
             A pandas DataFrame with similar schema as the one used to train
@@ -65,9 +122,10 @@ class ShiftedBetaSurvival(object):
             Number of times to restart the optimization procedure with a
             different seed, to avoid getting stuck on local maxima.
         """
+        # Transform dataframe extracting feature matrix, ages and alive status.
         x, y, z = self.dh.fit_transform(df)
 
-        # fit to data!
+        # fit to data using the ShiftedBeta object.
         self.sb.fit(X=x,
                     age=y,
                     alive=z,
