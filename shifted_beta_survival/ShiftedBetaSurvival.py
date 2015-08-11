@@ -93,7 +93,8 @@ class ShiftedBetaSurvival(object):
                               normalize=normalize)
 
         # Shifted beta model object
-        # Was a different gammab parameter passed?
+        # Was a different gammab parameter passed? If not, we use the same
+        # value passed to gamma.
         if gamma_beta is None:
             gamma_beta = 1.0 * gamma
         # create shifted beta object
@@ -139,6 +140,10 @@ class ShiftedBetaSurvival(object):
         :return: pandas DataFrame
             A DataFrame object with alpha and beta weights for each category
         """
+        # Construct a DataFrame consisting of feature name and corresponding
+        # alpha and beta parameters. Names are obtained by invoking the
+        # get_names() method, and the parameter displayed are the weights,
+        # not the final values (since that cannot be made sense in separate).
         suma = pd.DataFrame(data={name: (a, b) for name, a, b in
                                   zip(self.dh.get_names(),
                                       self.sb.alpha,
@@ -149,28 +154,78 @@ class ShiftedBetaSurvival(object):
 
     def predict_params(self, df):
         """
-        Predict alpha and beta for each sample
+        predict_params is a method capable of predicting the values of alpha
+        and beta for given combination of features. It invokes the
+        compute_alpha_beta method from the ShiftedBeta object to compute the
+        arrays of alpha and beta for every sample in df given the available
+        features.
 
-        :param df:
-        :return:
+        Notice that it must first transform the dataframe df using
+        DataHandler's transform method, so that it can than work with the lower
+        level feature matrix, x.
+
+        :param df: pandas DataFrame
+            A pandas dataframe with at least the same feature columns as the
+            one used to train the model.
+
+        :return: pandas DataFrame
+            A DataFrame with the predicted alpha and beta for each sample in df
         """
+        # Start by transforming df to its lower level np.array representation
         x, y, z = self.dh.transform(df=df)
+
+        # Use compute_alpha_beta to compute alpha and beta for every sample in
+        # df based on the feature matrix extracted from df, x.
         alpha, beta = self.sb.compute_alpha_beta(x, self.sb.alpha, self.sb.beta)
 
+        # Return a dataframe with predictions.
         return pd.DataFrame(data=np.vstack([alpha, beta]),
                             index=['alpha', 'beta']).T
 
     def predict_churn(self, df, age=None, **kwargs):
         """
-        Predict alpha and beta for each sample
+        predict_churn is a method to compute churn rate for a number of periods
+        conditioned on the age of the sample.
 
-        :param df:
-        :return:
+        This method invokes the churn_p_of_t from ShiftedBeta to compute the
+        churn rate for a given number of periods conditional on age. See the
+        description of churn_p_of_t in ShiftedBeta.py for more details.
+
+        This method is a wrapper, than transform the dataframe df to the
+        appropriate representation and feed it to the lower level method from
+        ShiftedBeta.
+
+        It is worth noticing that the user has the option to pass the value for
+        age, which can wither be a single number of an array with the same
+        length as df, and this will overwrite whatever other value for age
+        might come out when transforming df.
+
+        :param df: pandas DataFrame
+            A pandas dataframe with at least the same feature columns as the
+            one used to train the model.
+
+        :param age: None or float or ndarray of shape(df.shape[0], )
+            If age is None, the method will use the age parameter extracted
+            from df.
+            ** Notice that if age=None and df does not contain an age field,
+            a RuntimeError will be raised! **
+            If age != None, pass this value along to churn_p_of_t.
+
+        :param kwargs:
+            Any other arguments that should be redirected to churn_p_of_t.
+
+        :return: pandas DataFrame
+            A DataFrame with the churn_p_of_t matrix.
         """
         x, y, z = self.dh.transform(df=df)
 
         # If age field is present in prediction dataframe, we may choose to
-        # use it to calculate future churn.
+        # use it to calculate future churn. To do so, we first check if the
+        # user passed a new age parameter, if answer is yes, use the new age.
+        # If, however, the user did not pass age, use the value extracted from
+        # the dataframe, df.
+        # ** If no value for age is passed and the dataframe does not contain
+        # age, a RuntimeError is raised.
         if age is None:
             age = y
         if age is None:
@@ -178,8 +233,11 @@ class ShiftedBetaSurvival(object):
                                'the dataframe or passed separately as an '
                                'argument.')
 
+        # Create a dataframe with the churn_p_of_t matrix with all relevant
+        # parameters.
         out = pd.DataFrame(data=self.sb.churn_p_of_t(x, age=age, **kwargs))
 
+        # Give columns a decent, generic name.
         out.columns = ['period_{}'.format(col)
                        for col in range(1, out.shape[1] + 1)]
 
