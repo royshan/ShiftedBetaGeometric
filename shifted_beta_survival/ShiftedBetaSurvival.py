@@ -187,11 +187,11 @@ class ShiftedBetaSurvival(object):
         predict_churn is a method to compute churn rate for a number of periods
         conditioned on the age of the sample.
 
-        This method invokes the churn_p_of_t from ShiftedBeta to compute the
-        churn rate for a given number of periods conditional on age. See the
-        description of churn_p_of_t in ShiftedBeta.py for more details.
+        This method invokes the churn_p_of_t method from ShiftedBeta to compute
+        the churn rate for a given number of periods conditional on age. See
+        the description of churn_p_of_t in ShiftedBeta.py for more details.
 
-        This method is a wrapper, than transform the dataframe df to the
+        This method is a wrapper, it transforms the dataframe df to the
         appropriate representation and feed it to the lower level method from
         ShiftedBeta.
 
@@ -245,15 +245,49 @@ class ShiftedBetaSurvival(object):
 
     def predict_survival(self, df, age=None, **kwargs):
         """
-        Predict alpha and beta for each sample
+        predict_survival is a method to compute the survival curve for a number
+        of periods conditioned on the age of the sample.
 
-        :param df:
-        :return:
+        This method invokes the survival_function method from ShiftedBeta to
+        compute the retention rate for a given number of periods conditional
+        on age. See the description of survival_function in ShiftedBeta.py for
+        more details.
+
+        This method is a wrapper, it transforms the dataframe df to the
+        appropriate representation and feed it to the lower level method from
+        ShiftedBeta.
+
+        It is worth noticing that the user has the option to pass the value for
+        age, which can wither be a single number of an array with the same
+        length as df, and this will overwrite whatever other value for age
+        might come out when transforming df.
+
+        :param df: pandas DataFrame
+            A pandas dataframe with at least the same feature columns as the
+            one used to train the model.
+
+        :param age: None or float or ndarray of shape(df.shape[0], )
+            If age is None, the method will use the age parameter extracted
+            from df.
+            ** Notice that if age=None and df does not contain an age field,
+            a RuntimeError will be raised! **
+            If age != None, pass this value along to survival_function.
+
+        :param kwargs:
+            Any other arguments that should be redirected to survival_function.
+
+        :return: pandas DataFrame
+            A DataFrame with the survival_function matrix.
         """
         x, y, z = self.dh.transform(df=df)
 
         # If age field is present in prediction dataframe, we may choose to
-        # use it to calculate future churn.
+        # use it to calculate future churn. To do so, we first check if the
+        # user passed a new age parameter, if answer is yes, use the new age.
+        # If, however, the user did not pass age, use the value extracted from
+        # the dataframe, df.
+        # ** If no value for age is passed and the dataframe does not contain
+        # age, a RuntimeError is raised.
         if age is None:
             age = y
         if age is None:
@@ -261,10 +295,13 @@ class ShiftedBetaSurvival(object):
                                'the dataframe or passed separately as an '
                                'argument.')
 
+        # Create a dataframe with the churn_p_of_t matrix with all relevant
+        # parameters.
         out = pd.DataFrame(data=self.sb.survival_function(x,
                                                           age=age,
                                                           **kwargs))
 
+        # Give columns a decent, generic name.
         out.columns = ['period_{}'.format(col)
                        for col in range(1, out.shape[1] + 1)]
 
@@ -272,13 +309,55 @@ class ShiftedBetaSurvival(object):
 
     def predict_ltv(self, df, age=None, alive=None, **kwargs):
         """
+        predict_ltv is a method to compute the ltv for each sample conditioned
+        on age.
 
-        :param df:
+        This method invokes the derl method from ShiftedBeta to compute
+        the residual ltv of each sample given its given age. See the
+        description of derl in ShiftedBeta.py for more details.
+
+        This method is a wrapper, it transforms the dataframe df to the
+        appropriate representation and feed it to the lower level method from
+        ShiftedBeta.
+
+        It is worth noticing that the user has the option to pass the value for
+        both age and alive fields, which can wither be a single number of an
+        array with the same length as df, and this will overwrite whatever
+        other value for age and/or alive might come out when transforming df.
+
+        :param df: pandas DataFrame
+            A pandas dataframe with at least the same feature columns as the
+            one used to train the model.
+
+        :param age: None or float or ndarray of shape(df.shape[0], )
+            If age is None, the method will use the age parameter extracted
+            from df.
+            ** Notice that if age=None and df does not contain an age field,
+            a RuntimeError will be raised! **
+            If age != None, pass this value along to derl.
+
+        :param alive: None or float or ndarray of shape(df.shape[0], )
+            If age is None, the method will use the alive parameter extracted
+            from df.
+            ** Notice that if alive=None and df does not contain an alive
+            field, a RuntimeError will be raised! **
+            If alive != None, pass this value along to derl.
+
         :param kwargs:
-        :return:
+            Any other arguments that should be redirected to derl.
+
+        :return: pandas DataFrame
+            A DataFrame with the ltv predictions.
         """
         x, y, z = self.dh.transform(df=df)
 
+        # If age field is present in prediction dataframe, we may choose to
+        # use it to calculate future churn. To do so, we first check if the
+        # user passed a new age parameter, if answer is yes, use the new age.
+        # If, however, the user did not pass age, use the value extracted from
+        # the dataframe, df.
+        # ** If no value for age is passed and the dataframe does not contain
+        # age, a RuntimeError is raised.
         if age is None:
             age = y
         if age is None:
@@ -286,6 +365,7 @@ class ShiftedBetaSurvival(object):
                                'the dataframe or passed separately as an '
                                'argument.')
 
+        # See the discussion above for age, exact same logic applies.
         if alive is None:
             alive = z
         if alive is None:
@@ -293,6 +373,7 @@ class ShiftedBetaSurvival(object):
                                'dataframe or passed separately as an '
                                'argument.')
 
+        # Get LTVs and return a dataframe!
         ltvs = self.sb.derl(x, age=age, alive=alive, **kwargs)
 
         return pd.DataFrame(data=ltvs, columns=['ltv'])
