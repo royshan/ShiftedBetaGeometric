@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, division
 import numpy as np
 import pandas as pd
 
@@ -51,10 +51,124 @@ def make_raw_article_data():
 
     return data
 
+# Define parameters of the model!
+params = dict(alpha=dict(bias=0.2,
+                         categ={'cat_a': 0.02,
+                                'cat_b': -0.08,
+                                'cat_c': -1e-2},
+                         count=0.065,
+                         numer=0.292),
+              beta=dict(bias=0.87,
+                        categ={'cat_a': -0.12,
+                               'cat_b': -0.3825,
+                               'cat_c': 0.69},
+                        count=-0.148,
+                        numer=0.021))
 
-def generate_model_data():
-    return 0
+
+def get_age(alpha, beta, max_age=10):
+    """
+    A function to simulate the life of a sample given its alpha and beta
+    parameters
+
+    :param alpha:
+    :param beta:
+    :param max_age:
+    :return:
+    """
+    age = 1
+    alive = 1
+
+    pchurn = np.random.beta(alpha, beta)
+
+    while age < max_age:
+        if np.random.random() <= pchurn:
+            alive = 0
+            break
+
+        age += 1
+
+    return age, alive
+
+def compute_alpha(row):
+
+    # Get alpha params
+    pdict = params['alpha']
+
+    # Start with bias
+    alpha = np.exp(pdict['bias'])
+
+    # add categorical contribution
+    alpha *= np.exp(pdict['categ'][row['category']])
+
+    # Add count and numerical contributions
+    alpha *= np.exp(pdict['count'] * row['counts'] +
+                    pdict['numer'] * row['numerical'])
+    # add noise
+    alpha *= np.exp(2e-2 * np.random.randn())
+    return alpha
+
+def compute_beta(row):
+
+    # Get beta params
+    pdict = params['beta']
+
+    # Start with bias
+    beta = np.exp(pdict['bias'])
+
+    # add categorical contribution
+    beta *= np.exp(pdict['categ'][row['category']])
+
+    # Add count and numerical contributions
+    beta *= np.exp(pdict['count'] * row['counts'] +
+                   pdict['numer'] * row['numerical'])
+    # add noise
+    beta *= np.exp(1e-2 * np.random.randn())
+
+    return beta
+
+def compute_age(row):
+    age, _ = get_age(row['alpha_true'], row['beta_true'], max_age=10)
+    return age
+
+
+def simulate_data(size=10000, max_age=10):
+
+    data = pd.DataFrame()
+    data['id'] = np.arange(size)
+
+    # add categories
+    data['category'] = np.random.choice(['cat_a', 'cat_b', 'cat_c'],
+                                        size,
+                                        p=[0.47, 0.36, 0.17])
+
+    # transform cotegory type
+    data['category'] = data['category'].astype('category')
+
+    # Add counts feature
+    data['counts'] = np.random.poisson(lam=0.25, size=size)
+
+    # add numerical gaussian feature
+    data['numerical'] = 0.5 * np.random.randn(size) + 1
+
+    # Add true alpha and beta params
+    data['alpha_true'] = data.apply(compute_alpha, axis=1)
+    data['beta_true'] = data.apply(compute_beta, axis=1)
+
+    # Simulate age
+    data['age'] = data.apply(compute_age, axis=1)
+
+    # for simplicity we assume all come from same cohort, so it is easy to set
+    # alive value
+    data['alive'] = data.age.apply(lambda x: 1 if x == max_age else 0)
+
+    # split in half
+    tr = data.iloc[:size//2]
+    te = data.iloc[size//2:].reset_index().drop('index', axis=1)
+
+    return {'train': tr, 'test': te, 'params': params}
 
 
 if __name__ == '__main__':
     print(make_raw_article_data().head())
+    print(simulate_data(100))
