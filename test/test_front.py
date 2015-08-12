@@ -25,14 +25,16 @@ def test_get_cats():
 def article_data():
 
     data = make_raw_article_data()
-    data['category'] = data['category'].apply(lambda x: 'bad' if x == 0 else 'good')
+    data['category'] = data['category'].apply(lambda x: 'bad' if x == 1 else 'good')
     data['category'] = data['category'].astype('category')
 
     sbs = ShiftedBetaSurvival(age='age', alive='alive', features='category',
                               gamma=1e-3, verbose=True)
-    sbs.fit(data, restarts=5)
+    sbs.fit(data, restarts=2)
 
-    print(sbs.predict_params(data))
+    print(sbs.summary())
+    print(sbs.predict_params(data).head())
+    print(sbs.predict_params(data).tail())
     #print(sbs.predict_survival(data, True))
 
 if __name__ == '__main__':
