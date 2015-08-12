@@ -53,14 +53,14 @@ def make_raw_article_data():
 
 # Define parameters of the model!
 params = dict(alpha=dict(bias=0.2,
-                         categ={'cat_a': 0.02,
-                                'cat_b': -0.08,
+                         categ={'cat_a': 0.09736,
+                                'cat_b': -0.368,
                                 'cat_c': -1e-2},
                          count=0.065,
                          numer=0.292),
               beta=dict(bias=0.87,
                         categ={'cat_a': -0.12,
-                               'cat_b': -0.3825,
+                               'cat_b': -0.4425,
                                'cat_c': 0.69},
                         count=-0.148,
                         numer=0.021))

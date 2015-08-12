@@ -437,7 +437,7 @@ class DataHandler(object):
             # dataframe, pandas will raise a KeyError, we catch it and return
             # None.
             try:
-                return data_frame[key].values
+                return data_frame[key].values.astype(int)
             except KeyError:
                 return None
 
