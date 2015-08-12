@@ -1,0 +1,27 @@
+from __future__ import print_function
+from generate_data import make_raw_article_data
+import pandas as pd
+from shifted_beta_survival import ShiftedBetaSurvival
+
+
+def main():
+
+    data = make_raw_article_data()
+
+    print(data)
+
+    # START MODELING
+    # Create the sbs object using all features. Lets keep gamma small and let
+    # the model "overfit" if necessary. We have enough data.
+    sbs = ShiftedBetaSurvival(age='age',
+                              alive='alive',
+                              features=['is_high_end'],
+                              gamma=1e-6,
+                              verbose=True)
+
+    sbs.fit(data)
+
+    print(sbs.summary())
+
+if __name__ == '__main__':
+    main()
