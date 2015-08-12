@@ -117,6 +117,9 @@ class ShiftedBeta(object):
         alpha = max(min(alpha, 1e5), 1e-5)
         beta = max(min(beta, 1e5), 1e-5)
 
+        # Make sure num_periods is an integer!
+        num_periods = int(num_periods)
+
         # --- Initialize Recursion Values
         # We hold off initializing p_old since it is not necessary until we
         # enter the loop. s_old is initialized to 1, as it should.

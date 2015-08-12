@@ -241,13 +241,13 @@ def sbs_test():
 if __name__ == '__main__':
     start = datetime.now()
 
-    #data = make_raw_article_data().iloc[:]
-    #data.insert(1, 'random', numpy.random.randint(0, 2, (data.shape[0], 1)))
-    #names = ['bias', 'category', 'random']
-    #sb_test(data[['category', 'random']], data['age'], data['alive'], names)
+    data = make_raw_article_data().iloc[:]
+    data.insert(1, 'random', numpy.random.randint(0, 2, (data.shape[0], 1)))
+    names = ['bias', 'category', 'random']
+    sb_test(data[['category', 'random']], data['age'], data['alive'], names)
 
     #sb_test2()
-    sb_test3()
+    #sb_test3()
     #surv_plot()
 
     #sbs_test()
