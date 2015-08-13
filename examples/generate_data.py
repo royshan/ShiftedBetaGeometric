@@ -128,8 +128,9 @@ def compute_beta(row):
     return beta
 
 def compute_age(row):
-    age, _ = get_age(row['alpha_true'], row['beta_true'], max_age=10)
-    return age
+    max_age = np.random.choice([8, 9, 10, 11], 1, p=[0.3, 0.3, 0.2, 0.2])[0]
+    age, alive = get_age(row['alpha_true'], row['beta_true'], max_age=max_age)
+    return age, alive
 
 
 def simulate_data(size=10000, max_age=10):
@@ -156,11 +157,14 @@ def simulate_data(size=10000, max_age=10):
     data['beta_true'] = data.apply(compute_beta, axis=1)
 
     # Simulate age
-    data['age'] = data.apply(compute_age, axis=1)
+    sim = data.apply(compute_age, axis=1)
+        
+    # Update age values    
+    data['age'] = [s[0] for s in sim]
 
     # for simplicity we assume all come from same cohort, so it is easy to set
     # alive value
-    data['alive'] = data.age.apply(lambda x: 1 if x == max_age else 0)
+    data['alive'] = [s[1] for s in sim]
 
     # split in half
     tr = data.iloc[:size//2]
