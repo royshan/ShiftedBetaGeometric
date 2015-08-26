@@ -1,1 +1,0 @@
-from shifted_beta_survival.ShiftedBetaSurvival import ShiftedBetaSurvival
