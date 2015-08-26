@@ -1,7 +1,7 @@
 from __future__ import print_function
 from generate_data import simulate_data
 import pandas as pd
-from shifted_beta_survival import ShiftedBetaSurvival
+from sbg_survival import SBGSurvival
 
 
 def main():
@@ -30,7 +30,7 @@ def main():
     # START MODELING
     # Create the sbs object using all features. Lets keep gamma small and let
     # the model "overfit" if necessary. We have enough data.
-    sbs = ShiftedBetaSurvival(age='age',
+    sbs = SBGSurvival(age='age',
                               alive='alive',
                               features=['category', 'counts', 'numerical'],
                               gamma=1e-6,
